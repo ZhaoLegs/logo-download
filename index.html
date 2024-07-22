@@ -5,15 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
     <title>App Store & Google Play Icon Extractor</title>  
     <style>  
-        /* 定义全局样式变量 */  
         :root {  
-            --primary-color: #007AFF;  
-            --secondary-color: #0056b3;  
-            --text-color: #333;  
             --background-color: #f5f5f7;  
+            --text-color: #333;  
+            --primary-color: #007aff;  
+            --secondary-color: #0056b3;  
         }  
 
-        /* 设置页面样式 */  
         body {  
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;  
             max-width: 1000px;  
@@ -28,13 +26,11 @@
             color: var(--text-color);  
         }  
 
-        /* 标题样式 */  
         h1 {  
             margin-bottom: 24px;  
             color: var(--text-color);  
         }  
 
-        /* 搜索表单样式 */  
         #search-form {  
             margin-bottom: 64px;  
             position: relative;  
@@ -78,7 +74,6 @@
             color: var(--text-color);  
         }  
 
-        /* 加载指示器样式 */  
         #loading-indicator {  
             display: none;  
             position: absolute;  
@@ -98,7 +93,6 @@
             100% { transform: rotate(360deg); }  
         }  
 
-        /* 搜索结果样式 */  
         #results {  
             display: flex;  
             flex-wrap: wrap;  
@@ -167,7 +161,6 @@
             font-size: 16px;  
         }  
 
-        /* 移动端样式调整 */  
         @media (max-width: 600px) {  
             #search-input {  
                 width: 100%;  
@@ -190,41 +183,37 @@
     <div id="results"></div>  
 
     <script>  
-        // 获取页面元素  
         const searchForm = document.getElementById('search-form');  
         const searchInput = document.getElementById('search-input');  
         const clearSearch = document.getElementById('clear-search');  
         const resultsDiv = document.getElementById('results');  
         const loadingIndicator = document.getElementById('loading-indicator');  
 
-        // 为表单和输入框添加事件监听器  
         searchForm.addEventListener('submit', handleSearch);  
         clearSearch.addEventListener('click', clearSearchInput);  
         searchInput.addEventListener('input', handleInputChange);  
 
-        // 处理搜索表单提交  
         async function handleSearch(e) {  
             e.preventDefault();  
             const searchTerm = searchInput.value.trim();  
             if (!searchTerm) return;  
 
-            // 显示加载指示器  
             loadingIndicator.style.display = 'block';  
 
-            // 搜索 App Store 和 Google Play 应用  
-            const appStoreResults = await searchAppStoreApps(searchTerm);  
+            const appStoreResults = await Promise.all([  
+                searchAppStoreApps(searchTerm, 'us'),  
+                searchAppStoreApps(searchTerm, 'cn')  
+            ]);  
             const googlePlayResults = await searchGooglePlayApps(searchTerm);  
-            const allResults = [...appStoreResults, ...googlePlayResults];  
+            const allResults = [...appStoreResults.flat(), ...googlePlayResults];  
 
-            // 隐藏加载指示器  
             loadingIndicator.style.display = 'none';  
 
-            // 显示搜索结果  
-            displayResults(allResults);  
+            const sortedResults = await sortResultsByRelevance(allResults, searchTerm);  
+            displayResults(sortedResults);  
             document.body.style.justifyContent = 'flex-start';  
         }  
 
-        // 清除搜索输入框内容  
         function clearSearchInput() {  
             searchInput.value = '';  
             searchInput.focus();  
@@ -233,7 +222,6 @@
             document.body.style.justifyContent = 'center';  
         }  
 
-        // 处理搜索输入框变化  
         function handleInputChange() {  
             toggleClearButton();  
             if (!searchInput.value) {  
@@ -241,15 +229,33 @@
             }  
         }  
 
-        // 显示或隐藏清除按钮  
         function toggleClearButton() {  
             clearSearch.style.display = searchInput.value ? 'block' : 'none';  
         }  
 
-        // 搜索 App Store 应用  
-        async function searchAppStoreApps(term) {  
+        async function sortResultsByRelevance(apps, searchTerm) {  
+            return apps.sort(async (a, b) => {  
+                const nameScoreA = await calculateNameScore(a.trackName, searchTerm);  
+                const nameScoreB = await calculateNameScore(b.trackName, searchTerm);  
+                return nameScoreA - nameScoreB;  
+            });  
+        }  
+
+        async function calculateNameScore(name, searchTerm) {  
+            const regex = new RegExp(searchTerm, 'i');  
+            const match = name.match(regex);  
+            if (match) {  
+                const distance = match.index;  
+                const normalizedDistance = distance / name.length;  
+                return normalizedDistance;  
+            } else {  
+                return 1;  
+            }  
+        }  
+
+        async function searchAppStoreApps(term, country) {  
             try {  
-                const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=20`);  
+                const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=20&country=${country}`);  
                 if (!response.ok) throw new Error('Network response was not ok');  
                 const data = await response.json();  
                 return data.results;  
@@ -259,7 +265,6 @@
             }  
         }  
 
-        // 搜索 Google Play 应用  
         async function searchGooglePlayApps(term) {  
             try {  
                 const response = await fetch(`https://play.google.com/store/search?q=${encodeURIComponent(term)}&c=apps`);  
@@ -279,15 +284,23 @@
             }  
         }  
 
-        // 显示搜索结果  
         function displayResults(apps) {  
             resultsDiv.innerHTML = '';  
             if (apps.length === 0) {  
                 resultsDiv.innerHTML = '<div id="no-results">No results found. Please try another search.</div>';  
                 return;  
             }  
-            const fragment = document.createDocumentFragment();  
+
+            const uniqueApps = new Map();  
             apps.forEach(app => {  
+                const key = `${app.artworkUrl512 || app.artworkUrl100}-${app.trackName}`;  
+                if (!uniqueApps.has(key)) {  
+                    uniqueApps.set(key, app);  
+                }  
+            });  
+
+            const fragment = document.createDocumentFragment();  
+            uniqueApps.forEach(app => {  
                 const iconUrl = app.artworkUrl512 || app.artworkUrl100;  
                 const appName = app.trackName;  
                 const appUrl = app.url || `https://apps.apple.com/app/id${app.trackId}`;  
@@ -305,12 +318,10 @@
             resultsDiv.addEventListener('click', handleDownload);  
         }  
 
-        // 导航到应用程序页面  
         function navigateToApp(url) {  
             window.open(url, '_blank');  
         }  
 
-        // 处理下载图标点击事件  
         function handleDownload(e) {  
             if (e.target.classList.contains('download-btn')) {  
                 const url = e.target.dataset.url;  
@@ -319,7 +330,6 @@
             }  
         }  
 
-        // 下载应用图标  
         async function downloadIcon(url, name) {  
             try {  
                 const response = await fetch(url);  
