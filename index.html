@@ -209,7 +209,7 @@
 
             loadingIndicator.style.display = 'none';  
 
-            const sortedResults = await sortResultsByRelevance(allResults, searchTerm);  
+            const sortedResults = sortResultsByRelevance(allResults, searchTerm);  
             displayResults(sortedResults);  
             document.body.style.justifyContent = 'flex-start';  
         }  
@@ -233,23 +233,21 @@
             clearSearch.style.display = searchInput.value ? 'block' : 'none';  
         }  
 
-        async function sortResultsByRelevance(apps, searchTerm) {  
-            return apps.sort(async (a, b) => {  
-                const nameScoreA = await calculateNameScore(a.trackName, searchTerm);  
-                const nameScoreB = await calculateNameScore(b.trackName, searchTerm);  
-                return nameScoreA - nameScoreB;  
+        function sortResultsByRelevance(apps, searchTerm) {  
+            return apps.sort((a, b) => {  
+                const nameScoreA = calculateNameScore(a.trackName, searchTerm);  
+                const nameScoreB = calculateNameScore(b.trackName, searchTerm);  
+                return nameScoreB - nameScoreA;  
             });  
         }  
 
-        async function calculateNameScore(name, searchTerm) {  
+        function calculateNameScore(name, searchTerm) {  
             const regex = new RegExp(searchTerm, 'i');  
             const match = name.match(regex);  
             if (match) {  
-                const distance = match.index;  
-                const normalizedDistance = distance / name.length;  
-                return normalizedDistance;  
+                return match.index;  
             } else {  
-                return 1;  
+                return name.length;  
             }  
         }  
 
