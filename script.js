@@ -4,11 +4,12 @@ class AppIconCollection {
         this.setupToast();
         this.initializeEventListeners();
         
-        // 缓存常用变量
+        // 修改默认搜索词为更可靠的应用
         this.defaultApps = [
-            'wechat', 'qq', 'alipay', 'taobao', 
-            'bilibili', 'weibo', 'facebook', 
-            'instagram', 'twitter', 'tiktok'
+            'facebook', 'instagram', 'twitter', 
+            'youtube', 'netflix', 'spotify',
+            'amazon', 'google', 'microsoft',
+            'whatsapp'
         ];
         
         // 防抖延迟时间
@@ -115,24 +116,35 @@ class AppIconCollection {
             this.displayResults(mergedResults);
         } catch (error) {
             console.error('Search error:', error);
-            this.showToast('搜索失败，请重试');
+            this.showToast('Search failed, please try again');
         }
     }
 
     async loadDefaultApps() {
         try {
-            const randomTerm = this.defaultApps[Math.floor(Math.random() * this.defaultApps.length)];
+            // 使用固定的热门应用作为默认搜索词
+            const defaultTerm = 'facebook';
             const [cnResults, usResults] = await Promise.all([
-                this.searchAppStore(randomTerm, 'cn'),
-                this.searchAppStore(randomTerm, 'us')
+                this.searchAppStore(defaultTerm, 'us'),  // 优先使用美国区
+                this.searchAppStore(defaultTerm, 'cn')
             ]);
 
             const allResults = this.mergeAndDeduplicateResults(cnResults, usResults);
             if (allResults.length > 0) {
                 this.displayResults(allResults);
             } else {
-                console.error('No results found for default apps');
-                this.showToast('加载推荐应用失败，请刷新重试');
+                // 如果第一次尝试失败，使用备用搜索词
+                const backupTerm = 'instagram';
+                const [backupResults] = await Promise.all([
+                    this.searchAppStore(backupTerm, 'us')
+                ]);
+                
+                if (backupResults.length > 0) {
+                    this.displayResults(backupResults);
+                } else {
+                    console.error('Failed to load default apps');
+                    this.showToast('加载推荐应用失败，请刷新重试');
+                }
             }
         } catch (error) {
             console.error('Default apps loading error:', error);
@@ -185,7 +197,7 @@ class AppIconCollection {
             })
             .catch(error => {
                 console.error('Download error:', error);
-                this.showToast('下载失败，请重试');
+                this.showToast('Download failed, please try again');
             });
     }
 }
