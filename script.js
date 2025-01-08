@@ -74,7 +74,7 @@ class AppIconCollection {
         document.body.appendChild(this.toast);
     }
 
-    showToast(message = 'Search failed, please try again', duration = 3000) {
+    showToast(message, duration = 3000) {
         const toast = document.querySelector('.toast');
         toast.textContent = message;
         toast.classList.add('show');
@@ -85,12 +85,8 @@ class AppIconCollection {
     }
 
     async performSearch() {
-        const searchTerm = this.searchInput.value.trim().toLowerCase(); // 转小写以提高缓存命中率
+        const searchTerm = this.searchInput.value.trim();
         if (!searchTerm) return;
-
-        // 防止重复搜索相同内容
-        if (searchTerm === this.lastSearchTerm) return;
-        this.lastSearchTerm = searchTerm;
 
         try {
             this.showLoading();
@@ -118,27 +114,19 @@ class AppIconCollection {
             const data = await response.json();
 
             if (data.results && data.results.length > 0) {
-                // 预加载图片
                 const processedResults = data.results.map(app => ({
                     ...app,
                     artworkUrl512: app.artworkUrl512 || 
                         (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
                 }));
-
-                // 存入缓存
+                
                 this.cache.set(searchTerm, processedResults);
-
-                // 预加载图片
-                processedResults.forEach(app => {
-                    const img = new Image();
-                    img.src = app.artworkUrl512;
-                });
-
                 this.hideLoading();
                 this.displayResults(processedResults);
             } else {
                 this.hideLoading();
-                this.resultsContainer.innerHTML = '<p>No results found</p>';
+                this.resultsContainer.innerHTML = '';  // 清空结果容器
+                this.showToast('No results found');   // 使用 toast 显示无结果提示
             }
         } catch (error) {
             console.error('Search error:', error);
