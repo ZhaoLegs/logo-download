@@ -44,17 +44,6 @@ class AppIconCollection {
             const term = this.searchInput.value.trim();
             term ? this.performSearch() : this.loadDefaultApps();
         }, this.SEARCH_DELAY));
-
-        // 添加回车搜索功能
-        this.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const term = this.searchInput.value.trim();
-                if (term) {
-                    this.performSearch();
-                }
-            }
-        });
     }
 
     // 防抖函数
@@ -68,11 +57,23 @@ class AppIconCollection {
 
     async searchAppStore(term, country) {
         try {
-            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=50&country=${country}`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const data = await response.json();
-            return data.results;
+            // 添加 JSONP 回调参数
+            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=50&country=${country}&callback=?`;
+            
+            // 使用 JSONP 方式请求
+            return new Promise((resolve, reject) => {
+                $.ajax({
+                    url: url,
+                    dataType: 'jsonp',
+                    success: (data) => {
+                        resolve(data.results);
+                    },
+                    error: (error) => {
+                        console.error(`${country} store search error:`, error);
+                        reject(error);
+                    }
+                });
+            });
         } catch (error) {
             console.error(`${country} store search error:`, error);
             return [];
@@ -127,11 +128,15 @@ class AppIconCollection {
             ]);
 
             const allResults = this.mergeAndDeduplicateResults(cnResults, usResults);
-            this.displayResults(allResults);
+            if (allResults.length > 0) {
+                this.displayResults(allResults);
+            } else {
+                console.error('No results found for default apps');
+                this.showToast('加载推荐应用失败，请刷新重试');
+            }
         } catch (error) {
             console.error('Default apps loading error:', error);
-            this.showToast('加载推荐应用失败');
-            this.resultsContainer.innerHTML = '<p style="text-align: center; color: rgba(255, 255, 255, 0.8);">加载推荐失败，请刷新重试</p>';
+            this.showToast('加载推荐应用失败，请刷新重试');
         }
     }
 
