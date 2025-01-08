@@ -12,6 +12,7 @@ class AppStartupIconDownload {
         this.setupWelcomeTitle();
         this.setupEmailLink();
         this.setupTwitterLink();
+        this.setupChineseAppMap();
     }
 
     initializeElements() {
@@ -86,8 +87,36 @@ class AppStartupIconDownload {
         }, duration);
     }
 
+    setupChineseAppMap() {
+        this.chineseAppMap = {
+            '抖音': 'TikTok',
+            '微信': 'WeChat',
+            '支付宝': 'Alipay',
+            '淘宝': 'Taobao',
+            '京东': 'JD',
+            '美团': 'Meituan',
+            '钉钉': 'DingTalk',
+            '腾讯': 'Tencent',
+            '百度': 'Baidu',
+            '哔哩哔哩': 'Bilibili',
+            '网易云音乐': 'NetEase Music',
+            '知乎': 'Zhihu',
+            '小红书': 'RED',
+            '快手': 'Kwai',
+            '饿了么': 'Ele.me',
+            '拼多多': 'Pinduoduo',
+            '微博': 'Weibo',
+            '豆瓣': 'Douban'
+        };
+    }
+
+    // 判断是否包含中文字符
+    isChineseQuery(text) {
+        return /[\u4e00-\u9fa5]/.test(text);
+    }
+
     async performSearch() {
-        const searchTerm = this.searchInput.value.trim();
+        let searchTerm = this.searchInput.value.trim();
         if (!searchTerm) return;
 
         try {
@@ -100,90 +129,174 @@ class AppStartupIconDownload {
                 return;
             }
 
-            // 设置较短的超时时间
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Request timeout')), 5000);
-            });
+            // 转换中文应用名称
+            const searchQuery = this.chineseAppMap[searchTerm] || searchTerm;
+            let results = null;
 
-            // 优先使用中国区 API
-            const fetchPromise = fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=30&country=cn`, {
-                headers: {
-                    'Accept': 'application/json'
+            // 判断搜索语言，决定搜索顺序
+            const isChineseSearch = this.isChineseQuery(searchTerm);
+
+            if (isChineseSearch) {
+                // 中文搜索：先搜中国区，再搜美国区
+                results = await this.searchInRegion(searchQuery, 'cn');
+                if (!results || results.length === 0) {
+                    results = await this.searchInRegion(searchQuery, 'us');
                 }
-            });
+            } else {
+                // 英文搜索：先搜美国区，再搜中国区
+                results = await this.searchInRegion(searchQuery, 'us');
+                if (!results || results.length === 0) {
+                    results = await this.searchInRegion(searchQuery, 'cn');
+                }
+            }
 
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
-            const data = await response.json();
+            // 如果映射后的搜索没有结果，尝试原始搜索词
+            if (!results && searchQuery !== searchTerm) {
+                if (isChineseSearch) {
+                    results = await this.searchInRegion(searchTerm, 'cn');
+                    if (!results || results.length === 0) {
+                        results = await this.searchInRegion(searchTerm, 'us');
+                    }
+                } else {
+                    results = await this.searchInRegion(searchTerm, 'us');
+                    if (!results || results.length === 0) {
+                        results = await this.searchInRegion(searchTerm, 'cn');
+                    }
+                }
+            }
 
-            if (data.results && data.results.length > 0) {
-                const processedResults = data.results.map(app => ({
-                    ...app,
-                    artworkUrl512: app.artworkUrl512 || 
-                        (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
-                }));
-                
-                this.cache.set(searchTerm, processedResults);
+            if (results && results.length > 0) {
+                this.cache.set(searchTerm, results);
                 this.hideLoading();
-                this.displayResults(processedResults);
+                this.displayResults(results);
             } else {
                 this.hideLoading();
-                this.resultsContainer.innerHTML = '';  // 清空结果容器
-                this.showToast('No results found');   // 使用 toast 显示无结果提示
+                this.resultsContainer.innerHTML = '';
+                this.showToast('No results found');
             }
+
         } catch (error) {
             console.error('Search error:', error);
             this.hideLoading();
+            this.showToast('Search failed, please try again');
+        }
+    }
 
-            // 如果中国区失败，尝试美国区（从缓存中查找）
-            const usSearchTerm = `us_${searchTerm}`;
-            if (this.cache.has(usSearchTerm)) {
-                this.displayResults(this.cache.get(usSearchTerm));
-                return;
-            }
-
-            try {
-                const backupResponse = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=30&country=us`);
-                
-                if (backupResponse.ok) {
-                    const backupData = await backupResponse.json();
-                    if (backupData.results && backupData.results.length > 0) {
-                        const processedResults = backupData.results.map(app => ({
-                            ...app,
-                            artworkUrl512: app.artworkUrl512 || 
-                                (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
-                        }));
-
-                        // 存入缓存（美国区结果单独存储）
-                        this.cache.set(usSearchTerm, processedResults);
-                        this.displayResults(processedResults);
-                        return;
+    async searchInRegion(term, region) {
+        try {
+            const response = await fetch(
+                `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=50&country=${region}`,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
                     }
                 }
-                this.showToast('Search failed, please try again');
-            } catch (backupError) {
-                console.error('Backup search error:', backupError);
-                this.showToast('Search failed, please try again');
-            }
+            );
+
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            if (!data.results || data.results.length === 0) return null;
+
+            // 增强的搜索结果排序处理
+            const processedResults = data.results
+                .filter(app => app.artworkUrl100 || app.artworkUrl512)
+                .map(app => {
+                    // 计算相关性得分
+                    const nameLower = app.trackName.toLowerCase();
+                    const searchLower = term.toLowerCase();
+                    let relevanceScore = 0;
+
+                    // 完全匹配得分最高
+                    if (nameLower === searchLower) {
+                        relevanceScore = 100;
+                    }
+                    // 开头匹配次之
+                    else if (nameLower.startsWith(searchLower)) {
+                        relevanceScore = 80;
+                    }
+                    // 包含关键词再次
+                    else if (nameLower.includes(searchLower)) {
+                        relevanceScore = 60;
+                    }
+                    // 关键词分词匹配
+                    else {
+                        const searchTerms = searchLower.split(/\s+/);
+                        const nameTerms = nameLower.split(/\s+/);
+                        const matchCount = searchTerms.filter(term => 
+                            nameTerms.some(nameTerm => nameTerm.includes(term))
+                        ).length;
+                        relevanceScore = (matchCount / searchTerms.length) * 40;
+                    }
+
+                    // 计算综合评分
+                    const ratingScore = (app.averageUserRating || 0) * 20; // 满分100分
+                    const popularityScore = Math.min(Math.log10(app.userRatingCount || 1) * 10, 100); // 满分100分
+                    const releaseScore = app.releaseDate ? 
+                        Math.min((new Date() - new Date(app.releaseDate)) / (1000 * 60 * 60 * 24 * 365), 5) * 10 : 0; // 最高50分
+
+                    // 返回带有评分的结果
+                    return {
+                        ...app,
+                        artworkUrl512: app.artworkUrl512 || 
+                            (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100),
+                        relevanceScore,
+                        ratingScore,
+                        popularityScore,
+                        releaseScore,
+                        totalScore: relevanceScore * 0.4 + // 相关性权重40%
+                                   ratingScore * 0.3 + // 评分权重30%
+                                   popularityScore * 0.2 + // 流行度权重20%
+                                   releaseScore * 0.1 // 时效性权重10%
+                    };
+                })
+                .sort((a, b) => {
+                    // 优先按相关性分数排序
+                    if (Math.abs(a.relevanceScore - b.relevanceScore) > 20) {
+                        return b.relevanceScore - a.relevanceScore;
+                    }
+                    // 相关性接近时，按综合得分排序
+                    return b.totalScore - a.totalScore;
+                })
+                .slice(0, 30);
+
+            return processedResults;
+        } catch (error) {
+            console.error(`Search error in ${region}:`, error);
+            return null;
         }
     }
 
     displayResults(results) {
-        document.body.classList.add('has-results');  // 添加标记类
-        this.resultsContainer.innerHTML = results.map(app => `
-            <div class="app-card">
-                <img src="${app.artworkUrl512 || app.artworkUrl100}" 
-                     alt="${app.trackName}" 
-                     class="app-icon"
-                     data-app-url="${app.trackViewUrl}"
-                     style="cursor: pointer;">
-                <h3 class="app-name">${app.trackName}</h3>
-                <button class="download-btn" 
-                        data-icon-url="${app.artworkUrl512 || app.artworkUrl100}"
-                        data-app-name="${app.trackName}">
-                    Download
-                </button>
-            </div>
-        `).join('');
+        document.body.classList.add('has-results');
+        
+        // 优化显示结果
+        this.resultsContainer.innerHTML = results
+            // 确保应用名称和图标都存在
+            .filter(app => app.trackName && (app.artworkUrl512 || app.artworkUrl100))
+            .map(app => {
+                // 处理应用名称，移除多余空格和特殊字符
+                const cleanName = app.trackName.trim().replace(/\s+/g, ' ');
+                
+                return `
+                    <div class="app-card">
+                        <img src="${app.artworkUrl512 || app.artworkUrl100}" 
+                             alt="${cleanName}" 
+                             class="app-icon"
+                             data-app-url="${app.trackViewUrl}"
+                             style="cursor: pointer;">
+                        <h3 class="app-name">${cleanName}</h3>
+                        <button class="download-btn" 
+                                data-icon-url="${app.artworkUrl512 || app.artworkUrl100}"
+                                data-app-name="${cleanName}">
+                            Download
+                        </button>
+                    </div>
+                `;
+            })
+            .join('');
 
         // 图标点击事件
         this.resultsContainer.querySelectorAll('.app-icon').forEach(icon => {
