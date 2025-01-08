@@ -83,7 +83,9 @@ class AppIconCollection {
 
     async performSearch() {
         const term = this.searchInput.value.trim();
-        if (!term) return this.loadDefaultApps();
+        if (!term) {
+            return this.loadDefaultApps();
+        }
 
         try {
             const [cnResults, usResults] = await Promise.all([
@@ -91,7 +93,15 @@ class AppIconCollection {
                 this.searchAppStore(term, 'us')
             ]);
 
-            this.displayResults(this.mergeAndDeduplicateResults(cnResults, usResults));
+            const mergedResults = this.mergeAndDeduplicateResults(cnResults, usResults);
+            
+            // 如果搜索没有结果，显示 No apps found
+            if (!mergedResults.length) {
+                this.resultsContainer.innerHTML = '<div class="no-results">No apps found</div>';
+                return;
+            }
+
+            this.displayResults(mergedResults);
         } catch (error) {
             console.error('Search error:', error);
             this.showToast('搜索失败，请重试');
@@ -116,11 +126,6 @@ class AppIconCollection {
     }
 
     displayResults(apps) {
-        if (!apps?.length) {
-            this.resultsContainer.innerHTML = '<div class="no-results">No apps found</div>';
-            return;
-        }
-
         const fragment = document.createDocumentFragment();
         apps.forEach(app => {
             const card = document.createElement('div');
