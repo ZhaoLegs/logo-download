@@ -9,6 +9,7 @@ class AppIconCollection {
         this.searchInput.placeholder = 'Enter app name';  // 搜索框占位符
         this.cache = new Map(); // 添加缓存
         this.lastSearchTerm = ''; // 记录上次搜索词
+        this.setupWelcomeTitle();
     }
 
     initializeElements() {
@@ -175,6 +176,7 @@ class AppIconCollection {
     }
 
     displayResults(results) {
+        document.body.classList.add('has-results');  // 添加标记类
         this.resultsContainer.innerHTML = results.map(app => `
             <div class="app-card">
                 <img src="${app.artworkUrl512 || app.artworkUrl100}" 
@@ -379,6 +381,35 @@ class AppIconCollection {
             const oldestKeys = Array.from(this.cache.keys()).slice(0, 20);
             oldestKeys.forEach(key => this.cache.delete(key));
         }
+    }
+
+    setupWelcomeTitle() {
+        const title = document.createElement('h1');
+        title.className = 'welcome-title';  // 移除 typing 类
+        document.body.appendChild(title);
+        this.welcomeTitle = title;
+
+        // 逐字打印文本
+        const text = 'App Startup Icon Download';
+        let index = 0;
+        
+        // 创建打字效果
+        const typeWriter = () => {
+            if (index < text.length) {
+                title.textContent += text.charAt(index);
+                index++;
+                setTimeout(typeWriter, 100);
+            }
+        };
+        
+        // 开始打字效果
+        setTimeout(typeWriter, 500);
+    }
+
+    // 当清空搜索结果时显示标题
+    clearResults() {
+        this.resultsContainer.innerHTML = '';
+        document.body.classList.remove('has-results');
     }
 }
 

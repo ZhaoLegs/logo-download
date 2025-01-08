@@ -317,3 +317,39 @@ body {
     width: auto;
     white-space: nowrap;
 } 
+
+.welcome-title {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 48px;
+    font-weight: 400;
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: center;
+    opacity: 1;
+    pointer-events: none;
+    z-index: 1;
+    white-space: nowrap;
+}
+
+/* 只在打字时显示光标 */
+.welcome-title.typing {
+    border-right: 3px solid #fff;
+    animation: blink 1.2s step-end infinite;
+}
+
+/* 光标闪烁动画 */
+@keyframes blink {
+    50% { 
+        border-color: transparent;
+    }
+}
+
+/* 当有搜索结果时隐藏标题 */
+.has-results .welcome-title {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: none;
+} 
