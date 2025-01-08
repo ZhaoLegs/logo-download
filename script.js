@@ -44,6 +44,17 @@ class AppIconCollection {
             const term = this.searchInput.value.trim();
             term ? this.performSearch() : this.loadDefaultApps();
         }, this.SEARCH_DELAY));
+
+        // 添加回车搜索功能
+        this.searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const term = this.searchInput.value.trim();
+                if (term) {
+                    this.performSearch();
+                }
+            }
+        });
     }
 
     // 防抖函数
@@ -95,10 +106,9 @@ class AppIconCollection {
 
             const mergedResults = this.mergeAndDeduplicateResults(cnResults, usResults);
             
-            // 如果搜索没有结果，显示 No apps found
+            // 如果没有搜索结果，直接加载默认应用
             if (!mergedResults.length) {
-                this.resultsContainer.innerHTML = '<div class="no-results">No apps found</div>';
-                return;
+                return this.loadDefaultApps();
             }
 
             this.displayResults(mergedResults);
