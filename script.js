@@ -7,6 +7,8 @@ class AppIconCollection {
         this.setupFallingIcons();
         this.animationInterval = null;
         this.searchInput.placeholder = 'Enter app name';  // 搜索框占位符
+        this.cache = new Map(); // 添加缓存
+        this.lastSearchTerm = ''; // 记录上次搜索词
     }
 
     initializeElements() {
@@ -67,45 +69,74 @@ class AppIconCollection {
     }
 
     async performSearch() {
-        const searchTerm = this.searchInput.value.trim();
+        const searchTerm = this.searchInput.value.trim().toLowerCase(); // 转小写以提高缓存命中率
         if (!searchTerm) return;
+
+        // 防止重复搜索相同内容
+        if (searchTerm === this.lastSearchTerm) return;
+        this.lastSearchTerm = searchTerm;
 
         try {
             this.showLoading();
 
-            // 设置超时
+            // 检查缓存
+            if (this.cache.has(searchTerm)) {
+                this.hideLoading();
+                this.displayResults(this.cache.get(searchTerm));
+                return;
+            }
+
+            // 设置较短的超时时间
             const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Request timeout')), 10000);
+                setTimeout(() => reject(new Error('Request timeout')), 5000);
             });
 
-            // 只请求中国区 App Store
-            const fetchPromise = fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=cn`);
+            // 优先使用中国区 API
+            const fetchPromise = fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=30&country=cn`, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
 
-            // 使用 Promise.race 来处理超时
             const response = await Promise.race([fetchPromise, timeoutPromise]);
             const data = await response.json();
 
-            this.hideLoading();
-
             if (data.results && data.results.length > 0) {
-                // 优化图标 URL 处理
+                // 预加载图片
                 const processedResults = data.results.map(app => ({
                     ...app,
                     artworkUrl512: app.artworkUrl512 || 
                         (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
                 }));
-                
+
+                // 存入缓存
+                this.cache.set(searchTerm, processedResults);
+
+                // 预加载图片
+                processedResults.forEach(app => {
+                    const img = new Image();
+                    img.src = app.artworkUrl512;
+                });
+
+                this.hideLoading();
                 this.displayResults(processedResults);
             } else {
+                this.hideLoading();
                 this.resultsContainer.innerHTML = '<p>No results found</p>';
             }
         } catch (error) {
             console.error('Search error:', error);
             this.hideLoading();
-            
-            // 如果中国区搜索失败，尝试美国区
+
+            // 如果中国区失败，尝试美国区（从缓存中查找）
+            const usSearchTerm = `us_${searchTerm}`;
+            if (this.cache.has(usSearchTerm)) {
+                this.displayResults(this.cache.get(usSearchTerm));
+                return;
+            }
+
             try {
-                const backupResponse = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=us`);
+                const backupResponse = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=30&country=us`);
                 
                 if (backupResponse.ok) {
                     const backupData = await backupResponse.json();
@@ -115,6 +146,9 @@ class AppIconCollection {
                             artworkUrl512: app.artworkUrl512 || 
                                 (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
                         }));
+
+                        // 存入缓存（美国区结果单独存储）
+                        this.cache.set(usSearchTerm, processedResults);
                         this.displayResults(processedResults);
                         return;
                     }
@@ -324,6 +358,14 @@ class AppIconCollection {
         icon.addEventListener('animationend', () => {
             icon.remove();
         });
+    }
+
+    // 清理过期缓存
+    cleanCache() {
+        if (this.cache.size > 50) { // 当缓存超过 50 条时清理
+            const oldestKeys = Array.from(this.cache.keys()).slice(0, 20);
+            oldestKeys.forEach(key => this.cache.delete(key));
+        }
     }
 }
 
