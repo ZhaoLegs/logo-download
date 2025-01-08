@@ -56,17 +56,12 @@ class AppIconCollection {
         if (!searchTerm) return;
 
         try {
-            // 显示加载状态
             this.showLoading();
 
-            // 添加错误处理和重试逻辑
-            const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=cn`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                },
-                mode: 'cors'  // 明确指定跨域模式
-            });
+            // 使用 allorigins 作为代理
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=cn`)}`;
+
+            const response = await fetch(proxyUrl);
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -74,27 +69,28 @@ class AppIconCollection {
 
             const data = await response.json();
             
-            // 隐藏加载状态
+            // allorigins 返回的数据需要解析 contents
+            const results = JSON.parse(data.contents);
+
             this.hideLoading();
 
-            if (data.results && data.results.length > 0) {
-                this.displayResults(data.results);
+            if (results.results && results.results.length > 0) {
+                this.displayResults(results.results);
             } else {
                 this.resultsContainer.innerHTML = '<p>No results found</p>';
             }
         } catch (error) {
             console.error('Search error:', error);
             this.hideLoading();
-            this.showToast('搜索失败，请重试');
             
-            // 如果是网络错误，可以尝试使用备用 API
+            // 如果第一个代理失败，尝试使用备用代理
             try {
-                const backupResponse = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=us`, {
-                    method: 'GET',
+                const backupProxyUrl = `https://cors-anywhere.herokuapp.com/https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=us`;
+                
+                const backupResponse = await fetch(backupProxyUrl, {
                     headers: {
-                        'Accept': 'application/json',
-                    },
-                    mode: 'cors'
+                        'Origin': window.location.origin
+                    }
                 });
                 
                 if (backupResponse.ok) {
@@ -104,8 +100,11 @@ class AppIconCollection {
                         return;
                     }
                 }
+                // 如果备用代理也失败，显示错误信息
+                this.showToast('搜索失败，请重试');
             } catch (backupError) {
                 console.error('Backup search error:', backupError);
+                this.showToast('搜索失败，请重试');
             }
         }
     }
