@@ -13,224 +13,142 @@ body {
     min-height: 100vh;
     position: relative;
     width: 100%;
-    background: #000;
+    align-items: center;
+    padding: 40px 0;
+    box-sizing: border-box;
 }
 
 /* 主内容区 */
 .main-content {
     flex: 1;
-    padding: 24px;
+    padding: 0 24px;
     width: 100%;
     box-sizing: border-box;
-    min-height: 100vh;
-    position: relative;
-    z-index: 1;
-    margin-left: 0;
-    padding-top: 120px;
-    padding-left: 24px;
-    padding-right: 24px;
-    padding-bottom: 24px;
-    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-height: 100%;
+    padding-bottom: 100px;
+}
+
+/* 标题和搜索区域的容器 */
+.search-container {
+    width: 100%;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* 顶部区域 */
 .top-section {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 40px;
-    width: 100%;
-    padding: 24px;
     position: fixed;
-    top: 0;
+    bottom: 0;
     left: 0;
-    z-index: 100;
+    width: 100%;
+    padding: 20px 0;
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
-    box-sizing: border-box;
+    z-index: 1000;
 }
 
-/* 搜索容器 */
 .search-container {
     flex: 1;
-    margin-right: 20px;
     max-width: 480px;
-    margin: 0 auto;
 }
 
 #searchInput {
     width: 100%;
     max-width: none;
-    padding: 15px 25px;
+    padding: 14px 24px;
     font-size: 16px;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.1);
     color: #fff;
-    border-radius: 14px;
+    border-radius: 999px;
     backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     font-family: 'IBM Plex Mono', monospace;
+    transform: scale(1);
+    will-change: transform, border, background, box-shadow;
 }
 
 #searchInput:hover {
     background: rgba(255, 255, 255, 0.08);
-    border-color: #8EBCF8;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(142, 188, 248, 0.1);
+    border: 2px solid #8EBCF8;
+    transform: scale(1.01);
+    box-shadow: 0 0 20px rgba(142, 188, 248, 0.1);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #searchInput:focus {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #8EBCF8;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(142, 188, 248, 0.15);
-}
-
-.submit-button {
-    padding: 15px 30px;
-    background: #4a6cf7;
-    color: white;
-    border: none;
-    border-radius: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: inherit;
-}
-
-.submit-button:hover {
-    background: #3955e6;
-    transform: translateY(-2px);
-}
-
-/* 模态框样式 */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(5px);
-    z-index: 1000;
-}
-
-.modal-content {
-    position: relative;
-    background: #1a1a1a;
-    margin: 10% auto;
-    padding: 30px;
-    width: 90%;
-    max-width: 500px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.close-modal {
-    position: absolute;
-    right: 20px;
-    top: 15px;
-    font-size: 24px;
-    cursor: pointer;
-    color: rgba(255, 255, 255, 0.5);
-}
-
-.modal-content h2 {
-    margin-top: 0;
-    color: #fff;
-}
-
-.modal-content form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.modal-content input,
-.modal-content select {
-    padding: 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    color: #fff;
-    font-family: inherit;
-}
-
-.modal-content button {
-    padding: 12px;
-    background: #4a6cf7;
-    color: white;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.modal-content button:hover {
-    background: #3955e6;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid #8EBCF8;
+    transform: scale(1.01);
+    box-shadow: 0 0 20px rgba(142, 188, 248, 0.1);
 }
 
 /* 保持原有的卡片样式 */
 .results-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 24px;
-    padding: 0;
     width: 100%;
-    position: relative;
-    z-index: 2;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    padding: 0;
 }
 
 .app-card {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 20px 16px;
-    text-align: center;
+    background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    cursor: pointer;
-    min-height: 160px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 16px 12px;
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     transform: translateY(0);
-    position: relative;
+}
+
+.app-card:hover {
+    transform: translateY(-5px);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .app-icon {
-    width: 80px;
-    height: 80px;
-    border-radius: 12px;
-    margin-bottom: 10px;
-    transition: transform 0.3s ease;
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
 }
 
 .app-name {
-    font-size: 13px;
-    margin: 10px 0 20px 0;
-    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+    margin: 0 0 16px 0;
+    color: #fff;
     font-weight: 400;
     font-family: 'IBM Plex Mono', monospace;
-    display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 100%;
-    line-height: 1.4;
 }
 
-/* 添加悬停效果 */
-.app-card:hover {
-    transform: translateY(-8px);
-    background: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+/* 添加下载按钮样式 */
+.download-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'IBM Plex Mono', monospace;
 }
 
-/* 图标也添加过渡效果 */
-.app-card:hover .app-icon {
-    transform: scale(1.05);
+.download-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 /* 响应式设计 */
@@ -240,6 +158,7 @@ body {
     }
 
     .main-content {
+        margin-left: 0;
         width: 100%;
         padding: 20px;
     }
@@ -247,7 +166,6 @@ body {
     .top-section {
         flex-direction: column;
         gap: 20px;
-        padding: 16px;
     }
 
     .search-container {
@@ -256,14 +174,15 @@ body {
     }
 
     #searchInput {
-        width: 100%;
-        box-sizing: border-box;
+        width: calc(100% - 50px);
     }
 
-    .main-content {
-        padding-top: 100px;
-        padding-left: 16px;
-        padding-right: 16px;
+    .search-container {
+        max-width: calc(100% - 48px);
+    }
+
+    #searchInput {
+        width: 100%;
     }
 } 
 
@@ -271,9 +190,9 @@ body {
 .loading {
     display: none;
     margin: 40px auto;
-    width: 32px;
-    height: 32px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
     border-radius: 50%;
     border-top-color: #fff;
     animation: spin 1s ease-in-out infinite;
@@ -297,52 +216,79 @@ body {
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     padding: 15px 30px;
-    border-radius: 14px;
+    border-radius: 10px;
     color: #fff;
     font-size: 14px;
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 2000;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    font-family: 'IBM Plex Mono', monospace;
 }
 
 .toast.show {
     opacity: 1;
 } 
 
-/* 下载按钮样式 */
-.download-btn {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.8);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 14px;
-    cursor: pointer;
+/* 添加标题样式 */
+.page-title {
+    font-size: 32px;
+    font-weight: 400;
+    text-align: center;
+    margin-bottom: 40px;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    transition: all 0.3s ease;
-    margin-top: auto;
-}
-
-.download-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.05);
+    color: #fff;
 } 
 
-/* 修改未找到应用的样式 */
-.no-results {
+/* 动画容器 */
+.falling-icons {
     position: fixed;
-    top: 50%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;  /* 防止干扰交互 */
+    z-index: 0;
+}
+
+/* 落下的图标样式 */
+.falling-icon {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    border-radius: 24px;
+    opacity: 0;
+    animation: falling cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+/* 落下动画 */
+@keyframes falling {
+    0% {
+        transform: translateY(-100px) rotate(0deg);
+        opacity: 0;
+    }
+    5% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(calc(100vh - 120px)) rotate(var(--rotation));  /* 在底部消失，使用变量控制旋转 */
+        opacity: 0;  /* 在底部淡出 */
+    }
+} 
+
+/* 无结果提示样式 */
+.results-container p {
+    position: absolute;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     text-align: center;
-    color: rgba(255, 255, 255, 0.8);
+    padding: 40px;
+    color: #fff;
     font-size: 20px;
     font-family: 'IBM Plex Mono', monospace;
-    width: 100%;
-    padding: 0 24px;
-    box-sizing: border-box;
-    z-index: 10;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 10px;
+    width: auto;
+    white-space: nowrap;
 } 

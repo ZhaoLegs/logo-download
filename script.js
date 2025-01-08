@@ -1,163 +1,89 @@
 class AppIconCollection {
     constructor() {
         this.initializeElements();
-        this.setupToast();
         this.initializeEventListeners();
-        
-        // 修改默认搜索词为更可靠的应用
-        this.defaultApps = [
-            'facebook', 'instagram', 'twitter', 
-            'youtube', 'netflix', 'spotify',
-            'amazon', 'google', 'microsoft',
-            'whatsapp'
-        ];
-        
-        // 防抖延迟时间
-        this.SEARCH_DELAY = 500;
-        
-        // 初始化完成后加载默认应用
-        this.loadDefaultApps();
+        this.setupLoading();
+        this.setupToast();
+        this.setupFallingIcons();
+        this.animationInterval = null;
     }
 
     initializeElements() {
         this.searchInput = document.getElementById('searchInput');
         this.resultsContainer = document.getElementById('results');
-        
-        // 创建 toast 元素
+    }
+
+    initializeEventListeners() {
+        // 搜索功能
+        this.searchInput.addEventListener('input', () => {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => this.performSearch(), 500);
+        });
+    }
+
+    setupLoading() {
+        this.loading = document.createElement('div');
+        this.loading.className = 'loading';
+        this.resultsContainer.appendChild(this.loading);
+    }
+
+    showLoading() {
+        this.loading.classList.add('active');
+    }
+
+    hideLoading() {
+        this.loading.classList.remove('active');
+    }
+
+    setupToast() {
         this.toast = document.createElement('div');
         this.toast.className = 'toast';
         document.body.appendChild(this.toast);
     }
 
-    setupToast() {
-        this.showToast = (message, duration = 3000) => {
-            this.toast.textContent = message;
-            this.toast.classList.add('show');
-            setTimeout(() => {
-                this.toast.classList.remove('show');
-            }, duration);
-        };
-    }
-
-    initializeEventListeners() {
-        // 使用防抖优化搜索
-        this.searchInput.addEventListener('input', this.debounce(() => {
-            const term = this.searchInput.value.trim();
-            term ? this.performSearch() : this.loadDefaultApps();
-        }, this.SEARCH_DELAY));
-    }
-
-    // 防抖函数
-    debounce(func, wait) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
-
-    async searchAppStore(term, country) {
-        try {
-            // 添加 JSONP 回调参数
-            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=50&country=${country}&callback=?`;
-            
-            // 使用 JSONP 方式请求
-            return new Promise((resolve, reject) => {
-                $.ajax({
-                    url: url,
-                    dataType: 'jsonp',
-                    success: (data) => {
-                        resolve(data.results);
-                    },
-                    error: (error) => {
-                        console.error(`${country} store search error:`, error);
-                        reject(error);
-                    }
-                });
-            });
-        } catch (error) {
-            console.error(`${country} store search error:`, error);
-            return [];
-        }
-    }
-
-    mergeAndDeduplicateResults(cnResults, usResults) {
-        const uniqueApps = new Map();
-        
-        // 使用 Map 优化去重过程
-        [...cnResults, ...usResults].forEach(app => {
-            if (!uniqueApps.has(app.trackId)) {
-                uniqueApps.set(app.trackId, app);
-            }
-        });
-        
-        return Array.from(uniqueApps.values());
+    showToast(message, duration = 2000) {
+        this.toast.textContent = message;
+        this.toast.classList.add('show');
+        setTimeout(() => {
+            this.toast.classList.remove('show');
+        }, duration);
     }
 
     async performSearch() {
         const term = this.searchInput.value.trim();
         if (!term) {
-            return this.loadDefaultApps();
+            this.resultsContainer.innerHTML = '';
+            return;
         }
 
+        this.showLoading();
         try {
-            const [cnResults, usResults] = await Promise.all([
-                this.searchAppStore(term, 'cn'),
-                this.searchAppStore(term, 'us')
-            ]);
-
-            const mergedResults = this.mergeAndDeduplicateResults(cnResults, usResults);
+            const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=50&country=cn`);
+            if (!response.ok) throw new Error('Search failed');
             
-            // 如果没有搜索结果，直接加载默认应用
-            if (!mergedResults.length) {
-                return this.loadDefaultApps();
-            }
-
-            this.displayResults(mergedResults);
+            const data = await response.json();
+            this.hideLoading();
+            this.displayResults(data.results);
         } catch (error) {
             console.error('Search error:', error);
-            this.showToast('Search failed, please try again');
-        }
-    }
-
-    async loadDefaultApps() {
-        try {
-            // 使用固定的热门应用作为默认搜索词
-            const defaultTerm = 'facebook';
-            const [cnResults, usResults] = await Promise.all([
-                this.searchAppStore(defaultTerm, 'us'),  // 优先使用美国区
-                this.searchAppStore(defaultTerm, 'cn')
-            ]);
-
-            const allResults = this.mergeAndDeduplicateResults(cnResults, usResults);
-            if (allResults.length > 0) {
-                this.displayResults(allResults);
-            } else {
-                // 如果第一次尝试失败，使用备用搜索词
-                const backupTerm = 'instagram';
-                const [backupResults] = await Promise.all([
-                    this.searchAppStore(backupTerm, 'us')
-                ]);
-                
-                if (backupResults.length > 0) {
-                    this.displayResults(backupResults);
-                } else {
-                    console.error('Failed to load default apps');
-                    this.showToast('加载推荐应用失败，请刷新重试');
-                }
-            }
-        } catch (error) {
-            console.error('Default apps loading error:', error);
-            this.showToast('加载推荐应用失败，请刷新重试');
+            this.hideLoading();
+            this.showToast('搜索失败，请重试');
         }
     }
 
     displayResults(apps) {
-        const fragment = document.createDocumentFragment();
+        this.resultsContainer.innerHTML = '';
+        
+        if (!apps || !apps.length) {
+            this.resultsContainer.innerHTML = '<p>No results found</p>';
+            return;
+        }
+
         apps.forEach(app => {
             const card = document.createElement('div');
             card.className = 'app-card';
-            const iconUrl = app.artworkUrl512 || app.artworkUrl100?.replace('100x100', '512x512') || app.artworkUrl100;
+            
+            const iconUrl = app.artworkUrl512 || app.artworkUrl100;
             
             card.innerHTML = `
                 <img src="${iconUrl}" alt="${app.trackName}" class="app-icon">
@@ -165,42 +91,152 @@ class AppIconCollection {
                 <button class="download-btn">Download</button>
             `;
 
-            card.querySelector('.download-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
+            card.querySelector('.download-btn').addEventListener('click', () => {
                 this.downloadIcon(iconUrl, app.trackName);
             });
 
-            fragment.appendChild(card);
+            this.resultsContainer.appendChild(card);
         });
-
-        this.resultsContainer.innerHTML = '';
-        this.resultsContainer.appendChild(fragment);
     }
 
-    downloadIcon(url, appName) {
-        fetch(url)
-            .then(response => response.blob())
-            .then(blob => {
-                const blobUrl = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = `${appName.replace(/\s+/g, '-').toLowerCase()}-icon.png`;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                
-                // 清理
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(blobUrl);
-                }, 100);
-            })
-            .catch(error => {
-                console.error('Download error:', error);
-                this.showToast('Download failed, please try again');
-            });
+    async downloadIcon(url, appName) {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `${appName}-icon.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+            
+            this.showToast('图标下载成功');
+        } catch (error) {
+            console.error('Download error:', error);
+            this.showToast('下载失败，请重试');
+        }
+    }
+
+    setupFallingIcons() {
+        this.fallingIconsContainer = document.querySelector('.falling-icons');
+        this.iconUrls = new Set();
+        this.defaultApps = [
+            // 社交媒体
+            'Instagram', 'TikTok', 'WeChat', 'Facebook',
+            'Twitter', 'LinkedIn', 'Snapchat', 'Pinterest',
+            'Reddit', 'Tumblr', 'Line', 'Twitch',
+            
+            // 通讯工具
+            'WhatsApp', 'Telegram', 'Discord', 'Messenger',
+            'Skype', 'Signal', 'Viber', 'Slack',
+            
+            // 音乐和视频
+            'Spotify', 'YouTube', 'Netflix', 'Disney+',
+            'Apple Music', 'Prime Video', 'HBO Max', 'Hulu',
+            'SoundCloud', 'Deezer', 'Tidal', 'Pandora',
+            
+            // 生产力工具
+            'Microsoft Teams', 'Zoom', 'Notion', 'Trello',
+            'Asana', 'Monday', 'Evernote', 'Todoist',
+            'Microsoft Office', 'Google Drive', 'Dropbox', 'Box',
+            
+            // 金融和支付
+            'PayPal', 'Venmo', 'Cash App', 'Stripe',
+            'Coinbase', 'Robinhood', 'Square', 'Wise',
+            
+            // 出行和地图
+            'Uber', 'Lyft', 'Google Maps', 'Waze',
+            'Airbnb', 'Booking.com', 'Expedia', 'TripAdvisor',
+            
+            // 购物
+            'Amazon', 'eBay', 'Shopify', 'Walmart',
+            'Target', 'SHEIN', 'Wish', 'Etsy',
+            
+            // 新闻和阅读
+            'Medium', 'Substack', 'Apple News', 'Flipboard',
+            'Kindle', 'Audible', 'Pocket', 'Feedly',
+            
+            // 健康和运动
+            'Strava', 'Nike Run Club', 'Fitbit', 'MyFitnessPal',
+            'Calm', 'Headspace', 'Peloton', 'AllTrails'
+        ];
+        
+        this.loadIconsFromCache();
+        setInterval(() => this.createFallingIcon(), 800);
+        
+        // 初始时立即创建多个图标
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => this.createFallingIcon(), i * 200);
+        }
+    }
+
+    async loadIconsFromCache() {
+        // 尝试从本地存储加载缓存的图标
+        const cachedIcons = localStorage.getItem('appIconCache');
+        const cacheTimestamp = localStorage.getItem('appIconCacheTimestamp');
+        const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity;
+        
+        // 如果缓存存在且未过期（7天）
+        if (cachedIcons && cacheAge < 7 * 24 * 60 * 60 * 1000) {
+            this.iconUrls = new Set(JSON.parse(cachedIcons));
+            console.log('Loaded icons from cache');
+        } else {
+            // 重新加载图标
+            await this.loadDefaultIcons();
+        }
+    }
+
+    async loadDefaultIcons() {
+        console.log('Loading fresh icons');
+        for (const appName of this.defaultApps) {
+            try {
+                const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(appName)}&entity=software&limit=1&country=us`);
+                const data = await response.json();
+                if (data.results && data.results[0]) {
+                    // 优先使用高清图标
+                    const iconUrl = data.results[0].artworkUrl512 || data.results[0].artworkUrl100;
+                    this.iconUrls.add(iconUrl);
+                }
+            } catch (error) {
+                console.error('Error loading default icon:', error);
+            }
+        }
+
+        // 保存到本地存储
+        if (this.iconUrls.size > 0) {
+            localStorage.setItem('appIconCache', JSON.stringify(Array.from(this.iconUrls)));
+            localStorage.setItem('appIconCacheTimestamp', Date.now().toString());
+        }
+    }
+
+    createFallingIcon() {
+        if (!this.iconUrls.size) return;
+
+        const icon = document.createElement('img');
+        icon.className = 'falling-icon';
+        
+        const iconUrlsArray = Array.from(this.iconUrls);
+        icon.src = iconUrlsArray[Math.floor(Math.random() * iconUrlsArray.length)];
+        
+        const startX = Math.random() * (window.innerWidth - 80);  // 减去图标宽度，防止超出右边界
+        const duration = 2 + Math.random() * 1;
+        const rotation = Math.random() < 0.5 ? 
+            `${180 + Math.random() * 180}deg` :  // 顺时针旋转 180-360 度
+            `${-(180 + Math.random() * 180)}deg`;  // 逆时针旋转 180-360 度
+        
+        icon.style.left = `${startX}px`;
+        icon.style.animationDuration = `${duration}s`;
+        icon.style.setProperty('--rotation', rotation);  // 设置随机旋转角度
+        
+        this.fallingIconsContainer.appendChild(icon);
+        
+        icon.addEventListener('animationend', () => {
+            icon.remove();
+        });
     }
 }
 
-// 确保 DOM 加载完成后再初始化
-document.addEventListener('DOMContentLoaded', () => new AppIconCollection()); 
+new AppIconCollection(); 
