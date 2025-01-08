@@ -1,4 +1,4 @@
-class AppIconCollection {
+class AppStartupIconDownload {
     constructor() {
         this.initializeElements();
         this.initializeEventListeners();
@@ -381,8 +381,8 @@ class AppIconCollection {
         document.body.appendChild(title);
         this.welcomeTitle = title;
 
-        // 逐字打印文本
-        const text = 'App Startup Icon Download';
+        // 修改显示文本
+        const text = 'App Startup Icon Download';  // 确保这里的文本保持一致
         let index = 0;
         
         // 创建打字效果
@@ -433,4 +433,10 @@ class AppIconCollection {
     }
 }
 
-new AppIconCollection(); 
+let appInstance = null;
+document.addEventListener('DOMContentLoaded', () => {
+    if (!appInstance) {
+        appInstance = new AppStartupIconDownload();
+        window.appStartupIconDownload = appInstance; // 用于调试
+    }
+}); 
