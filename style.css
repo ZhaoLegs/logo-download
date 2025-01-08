@@ -210,11 +210,12 @@ body {
 /* 添加提示框样式 */
 .toast {
     position: fixed;
-    bottom: 30px;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 15px 30px;
     border-radius: 10px;
     color: #fff;
@@ -222,7 +223,9 @@ body {
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 2000;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .toast.show {
