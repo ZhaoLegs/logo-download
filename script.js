@@ -39,17 +39,30 @@ class AppIconCollection {
     }
 
     setupLoading() {
-        this.loading = document.createElement('div');
-        this.loading.className = 'loading';
-        this.resultsContainer.appendChild(this.loading);
+        // 创建容器
+        const loadingContainer = document.createElement('div');
+        loadingContainer.className = 'loading-container';
+        
+        // 创建 loading 元素
+        const loading = document.createElement('div');
+        loading.className = 'loading';
+        
+        // 组装
+        loadingContainer.appendChild(loading);
+        document.body.appendChild(loadingContainer);
+        this.loadingElement = loadingContainer;
     }
 
     showLoading() {
-        this.loading.classList.add('active');
+        if (this.loadingElement) {
+            this.loadingElement.style.display = 'block';
+        }
     }
 
     hideLoading() {
-        this.loading.classList.remove('active');
+        if (this.loadingElement) {
+            this.loadingElement.style.display = 'none';
+        }
     }
 
     setupToast() {
