@@ -6,6 +6,7 @@ class AppIconCollection {
         this.setupToast();
         this.setupFallingIcons();
         this.animationInterval = null;
+        this.searchInput.placeholder = 'Enter app name';  // 搜索框占位符
     }
 
     initializeElements() {
@@ -14,10 +15,24 @@ class AppIconCollection {
     }
 
     initializeEventListeners() {
-        // 搜索功能
+        // 监听输入框内容变化
         this.searchInput.addEventListener('input', () => {
             clearTimeout(this.searchTimeout);
+            
+            // 当输入框为空时清空结果
+            if (!this.searchInput.value.trim()) {
+                this.resultsContainer.innerHTML = '';
+                return;
+            }
+            
             this.searchTimeout = setTimeout(() => this.performSearch(), 500);
+        });
+
+        // 监听输入框清空事件（比如点击清除按钮）
+        this.searchInput.addEventListener('search', () => {
+            if (!this.searchInput.value.trim()) {
+                this.resultsContainer.innerHTML = '';
+            }
         });
     }
 
@@ -41,7 +56,7 @@ class AppIconCollection {
         document.body.appendChild(this.toast);
     }
 
-    showToast(message, duration = 3000) {
+    showToast(message = 'Search failed, please try again', duration = 3000) {
         const toast = document.querySelector('.toast');
         toast.textContent = message;
         toast.classList.add('show');
@@ -58,24 +73,29 @@ class AppIconCollection {
         try {
             this.showLoading();
 
-            // 使用 allorigins 作为代理
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=cn`)}`;
+            // 设置超时
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timeout')), 10000);
+            });
 
-            const response = await fetch(proxyUrl);
+            // 只请求中国区 App Store
+            const fetchPromise = fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=cn`);
 
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
+            // 使用 Promise.race 来处理超时
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
             const data = await response.json();
-            
-            // allorigins 返回的数据需要解析 contents
-            const results = JSON.parse(data.contents);
 
             this.hideLoading();
 
-            if (results.results && results.results.length > 0) {
-                this.displayResults(results.results);
+            if (data.results && data.results.length > 0) {
+                // 优化图标 URL 处理
+                const processedResults = data.results.map(app => ({
+                    ...app,
+                    artworkUrl512: app.artworkUrl512 || 
+                        (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
+                }));
+                
+                this.displayResults(processedResults);
             } else {
                 this.resultsContainer.innerHTML = '<p>No results found</p>';
             }
@@ -83,57 +103,87 @@ class AppIconCollection {
             console.error('Search error:', error);
             this.hideLoading();
             
-            // 如果第一个代理失败，尝试使用备用代理
+            // 如果中国区搜索失败，尝试美国区
             try {
-                const backupProxyUrl = `https://cors-anywhere.herokuapp.com/https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=us`;
-                
-                const backupResponse = await fetch(backupProxyUrl, {
-                    headers: {
-                        'Origin': window.location.origin
-                    }
-                });
+                const backupResponse = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=us`);
                 
                 if (backupResponse.ok) {
                     const backupData = await backupResponse.json();
                     if (backupData.results && backupData.results.length > 0) {
-                        this.displayResults(backupData.results);
+                        const processedResults = backupData.results.map(app => ({
+                            ...app,
+                            artworkUrl512: app.artworkUrl512 || 
+                                (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
+                        }));
+                        this.displayResults(processedResults);
                         return;
                     }
                 }
-                // 如果备用代理也失败，显示错误信息
-                this.showToast('搜索失败，请重试');
+                this.showToast('Search failed, please try again');
             } catch (backupError) {
                 console.error('Backup search error:', backupError);
-                this.showToast('搜索失败，请重试');
+                this.showToast('Search failed, please try again');
             }
         }
     }
 
-    displayResults(apps) {
-        this.resultsContainer.innerHTML = '';
-        
-        if (!apps || !apps.length) {
-            this.resultsContainer.innerHTML = '<p>No results found</p>';
-            return;
-        }
+    displayResults(results) {
+        this.resultsContainer.innerHTML = results.map(app => `
+            <div class="app-card">
+                <img src="${app.artworkUrl512 || app.artworkUrl100}" 
+                     alt="${app.trackName}" 
+                     class="app-icon"
+                     data-app-url="${app.trackViewUrl}"
+                     style="cursor: pointer;">
+                <h3 class="app-name">${app.trackName}</h3>
+                <button class="download-btn" 
+                        data-icon-url="${app.artworkUrl512 || app.artworkUrl100}"
+                        data-app-name="${app.trackName}">
+                    Download
+                </button>
+            </div>
+        `).join('');
 
-        apps.forEach(app => {
-            const card = document.createElement('div');
-            card.className = 'app-card';
-            
-            const iconUrl = app.artworkUrl512 || app.artworkUrl100;
-            
-            card.innerHTML = `
-                <img src="${iconUrl}" alt="${app.trackName}" class="app-icon">
-                <div class="app-name">${app.trackName}</div>
-                <button class="download-btn">Download</button>
-            `;
-
-            card.querySelector('.download-btn').addEventListener('click', () => {
-                this.downloadIcon(iconUrl, app.trackName);
+        // 图标点击事件
+        this.resultsContainer.querySelectorAll('.app-icon').forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                const appUrl = e.target.dataset.appUrl;
+                if (appUrl) {
+                    window.open(appUrl, '_blank');
+                }
             });
+        });
 
-            this.resultsContainer.appendChild(card);
+        // 下载按钮点击事件
+        this.resultsContainer.querySelectorAll('.download-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const iconUrl = e.target.dataset.iconUrl;
+                const appName = e.target.dataset.appName;
+                
+                try {
+                    const response = await fetch(iconUrl);
+                    const blob = await response.blob();
+                    
+                    // 创建下载链接
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = URL.createObjectURL(blob);
+                    downloadLink.download = `${appName}-icon.png`;  // 设置下载文件名
+                    
+                    // 触发下载
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    
+                    // 清理 URL 对象
+                    URL.revokeObjectURL(downloadLink.href);
+                    
+                    // 显示成功提示
+                    this.showToast('Icon downloaded successfully');
+                } catch (error) {
+                    console.error('Download error:', error);
+                    this.showToast('Download failed, please try again');
+                }
+            });
         });
     }
 
@@ -151,10 +201,10 @@ class AppIconCollection {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(blobUrl);
             
-            this.showToast('图标下载成功');
+            this.showToast('Icon downloaded successfully');
         } catch (error) {
             console.error('Download error:', error);
-            this.showToast('下载失败，请重试');
+            this.showToast('Download failed, please try again');
         }
     }
 

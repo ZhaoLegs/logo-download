@@ -64,7 +64,7 @@ body {
     background: rgba(255, 255, 255, 0.05);
     border: 2px solid rgba(255, 255, 255, 0.1);
     color: #fff;
-    border-radius: 999px;
+    border-radius: 16px;
     backdrop-filter: blur(10px);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
@@ -189,22 +189,17 @@ body {
 /* 添加 Loading 动画样式 */
 .loading {
     display: none;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 32px;
-    height: 32px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-top: 2px solid #fff;
+    margin: 40px auto;
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    z-index: 2000;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
 }
 
 @keyframes spin {
-    0% { transform: translate(-50%, -50%) rotate(0deg); }
-    100% { transform: translate(-50%, -50%) rotate(360deg); }
+    to { transform: rotate(360deg); }
 }
 
 /* 显示loading时的样式 */
@@ -289,9 +284,9 @@ body {
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
-    padding: 32px;
+    padding: 28px;
     color: #fff;
-    font-size: 20px;
+    font-size: 16px;
     font-family: 'IBM Plex Mono', monospace;
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
