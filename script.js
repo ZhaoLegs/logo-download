@@ -41,33 +41,72 @@ class AppIconCollection {
         document.body.appendChild(this.toast);
     }
 
-    showToast(message, duration = 2000) {
-        this.toast.textContent = message;
-        this.toast.classList.add('show');
+    showToast(message, duration = 3000) {
+        const toast = document.querySelector('.toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        
         setTimeout(() => {
-            this.toast.classList.remove('show');
+            toast.classList.remove('show');
         }, duration);
     }
 
     async performSearch() {
-        const term = this.searchInput.value.trim();
-        if (!term) {
-            this.resultsContainer.innerHTML = '';
-            return;
-        }
+        const searchTerm = this.searchInput.value.trim();
+        if (!searchTerm) return;
 
-        this.showLoading();
         try {
-            const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=50&country=cn`);
-            if (!response.ok) throw new Error('Search failed');
-            
+            // 显示加载状态
+            this.showLoading();
+
+            // 添加错误处理和重试逻辑
+            const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=cn`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                mode: 'cors'  // 明确指定跨域模式
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
             const data = await response.json();
+            
+            // 隐藏加载状态
             this.hideLoading();
-            this.displayResults(data.results);
+
+            if (data.results && data.results.length > 0) {
+                this.displayResults(data.results);
+            } else {
+                this.resultsContainer.innerHTML = '<p>No results found</p>';
+            }
         } catch (error) {
             console.error('Search error:', error);
             this.hideLoading();
             this.showToast('搜索失败，请重试');
+            
+            // 如果是网络错误，可以尝试使用备用 API
+            try {
+                const backupResponse = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=software&limit=50&country=us`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                    mode: 'cors'
+                });
+                
+                if (backupResponse.ok) {
+                    const backupData = await backupResponse.json();
+                    if (backupData.results && backupData.results.length > 0) {
+                        this.displayResults(backupData.results);
+                        return;
+                    }
+                }
+            } catch (backupError) {
+                console.error('Backup search error:', backupError);
+            }
         }
     }
 
