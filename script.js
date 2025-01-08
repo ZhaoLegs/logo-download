@@ -22,10 +22,12 @@ class AppIconCollection {
         this.searchInput.addEventListener('input', () => {
             clearTimeout(this.searchTimeout);
             
-            // 当输入框为空时清空结果
+            // 当输入框为空时
             if (!this.searchInput.value.trim()) {
                 this.resultsContainer.innerHTML = '';
-                return;
+                document.body.classList.remove('has-results');
+                // 重新加载欢迎文字
+                this.reloadWelcomeTitle();
             }
             
             this.searchTimeout = setTimeout(() => this.performSearch(), 500);
@@ -385,7 +387,7 @@ class AppIconCollection {
 
     setupWelcomeTitle() {
         const title = document.createElement('h1');
-        title.className = 'welcome-title';  // 移除 typing 类
+        title.className = 'welcome-title';
         document.body.appendChild(title);
         this.welcomeTitle = title;
 
@@ -410,6 +412,16 @@ class AppIconCollection {
     clearResults() {
         this.resultsContainer.innerHTML = '';
         document.body.classList.remove('has-results');
+    }
+
+    reloadWelcomeTitle() {
+        // 移除旧的标题
+        if (this.welcomeTitle) {
+            this.welcomeTitle.remove();
+        }
+        
+        // 重新创建并开始打字效果
+        this.setupWelcomeTitle();
     }
 }
 
