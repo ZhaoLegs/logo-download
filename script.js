@@ -10,6 +10,8 @@ class AppIconCollection {
         this.cache = new Map(); // 添加缓存
         this.lastSearchTerm = ''; // 记录上次搜索词
         this.setupWelcomeTitle();
+        this.setupEmailLink();
+        this.setupTwitterLink();
     }
 
     initializeElements() {
@@ -410,6 +412,24 @@ class AppIconCollection {
         
         // 重新创建并开始打字效果
         this.setupWelcomeTitle();
+    }
+
+    setupEmailLink() {
+        const emailLink = document.createElement('a');
+        emailLink.href = 'mailto:zhaolegs@gmail.com';
+        emailLink.className = 'email-link';
+        emailLink.textContent = 'zhaolegs@gmail.com';
+        document.body.appendChild(emailLink);
+    }
+
+    setupTwitterLink() {
+        const twitterLink = document.createElement('a');
+        twitterLink.href = 'https://x.com/ZhaoLegs';
+        twitterLink.className = 'twitter-link';
+        twitterLink.textContent = 'Twitter';
+        twitterLink.target = '_blank';  // 在新标签页打开
+        twitterLink.rel = 'noopener noreferrer';  // 安全属性
+        document.body.appendChild(twitterLink);
     }
 }
 

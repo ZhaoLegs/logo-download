@@ -148,7 +148,8 @@ body {
 }
 
 .download-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: #8EBCF8;
+    color: #000;
 }
 
 /* 响应式设计 */
@@ -352,4 +353,20 @@ body {
     opacity: 0;
     transition: opacity 0.3s ease;
     animation: none;
+} 
+
+.twitter-link {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    text-decoration: none;
+    transition: color 0.3s ease;
+    z-index: 1000;
+}
+
+.twitter-link:hover {
+    color: #fff;
 } 
