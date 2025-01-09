@@ -31,14 +31,6 @@ body {
     padding-bottom: 100px;
 }
 
-/* 标题和搜索区域的容器 */
-.search-container {
-    width: 100%;
-    max-width: 480px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
 /* 顶部区域 */
 .top-section {
     position: fixed;
@@ -51,15 +43,23 @@ body {
     z-index: 1000;
 }
 
+.center-search {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
 .search-container {
-    flex: 1;
+    width: 100%;
     max-width: 480px;
+    margin: 0 auto;
 }
 
 #searchInput {
     width: 100%;
-    max-width: none;
-    padding: 14px 24px;
+    padding: 16px 20px;
     font-size: 16px;
     background: rgba(255, 255, 255, 0.05);
     border: 2px solid rgba(255, 255, 255, 0.1);
@@ -321,11 +321,11 @@ body {
 
 .welcome-title {
     position: fixed;
-    top: 50%;
+    bottom: -106px;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, 0);
     color: #fff;
-    font-size: 48px;
+    font-size: 104px;
     font-weight: 400;
     font-family: 'IBM Plex Mono', monospace;
     text-align: center;
@@ -369,4 +369,27 @@ body {
 
 .twitter-link:hover {
     color: #fff;
+} 
+
+/* 添加搜索结果时的吸顶样式 */
+.has-results .center-search {
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 20px 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+}
+
+/* 添加内容偏移，防止搜索框遮挡内容 */
+.has-results .results-container {
+    margin-top: 100px;
+} 
+
+/* 当有搜索结果时隐藏 Twitter 链接 */
+.has-results .twitter-link {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
 } 

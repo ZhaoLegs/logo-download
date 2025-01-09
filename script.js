@@ -10,7 +10,6 @@ class AppStartupIconDownload {
         this.cache = new Map(); // 添加缓存
         this.lastSearchTerm = ''; // 记录上次搜索词
         this.setupWelcomeTitle();
-        this.setupEmailLink();
         this.setupTwitterLink();
         this.setupChineseAppMap();
     }
@@ -525,14 +524,6 @@ class AppStartupIconDownload {
         
         // 重新创建并开始打字效果
         this.setupWelcomeTitle();
-    }
-
-    setupEmailLink() {
-        const emailLink = document.createElement('a');
-        emailLink.href = 'mailto:zhaolegs@gmail.com';
-        emailLink.className = 'email-link';
-        emailLink.textContent = 'zhaolegs@gmail.com';
-        document.body.appendChild(emailLink);
     }
 
     setupTwitterLink() {
