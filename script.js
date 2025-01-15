@@ -41,6 +41,14 @@ class AppStartupIconDownload {
                 this.resultsContainer.innerHTML = '';
             }
         });
+
+        document.querySelector('.clear-button').addEventListener('click', () => {
+            this.searchInput.value = '';
+            this.searchInput.focus();
+            this.resultsContainer.innerHTML = '';
+            document.body.classList.remove('has-results');
+            this.reloadWelcomeTitle();
+        });
     }
 
     setupLoading() {

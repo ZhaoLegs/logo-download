@@ -55,37 +55,56 @@ body {
     width: 100%;
     max-width: 480px;
     margin: 0 auto;
+    transition: max-width 0.3s ease;
+    position: relative;
+}
+
+/* 当搜索框获得焦点时，容器变宽 */
+.search-container:focus-within {
+    max-width: 600px;
 }
 
 #searchInput {
     width: 100%;
     padding: 16px 20px;
     font-size: 16px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.20);
+    border: none;
     color: #fff;
+    caret-color: #fff;
     border-radius: 16px;
     backdrop-filter: blur(10px);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     font-family: 'IBM Plex Mono', monospace;
     transform: scale(1);
-    will-change: transform, border, background, box-shadow;
+    will-change: transform, background, box-shadow, width;
 }
 
 #searchInput:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border: 2px solid #8EBCF8;
+    background: rgba(255, 255, 255, 0.20);
     transform: scale(1.01);
-    box-shadow: 0 0 20px rgba(142, 188, 248, 0.1);
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #searchInput:focus {
-    background: rgba(255, 255, 255, 0.08);
-    border: 2px solid #8EBCF8;
+    background: rgba(255, 255, 255, 0.20);
     transform: scale(1.01);
-    box-shadow: 0 0 20px rgba(142, 188, 248, 0.1);
+}
+
+#searchInput::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+#searchInput::-webkit-input-placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+#searchInput::-moz-placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+#searchInput:-ms-input-placeholder {
+    color: rgba(255, 255, 255, 0.6);
 }
 
 /* 保持原有的卡片样式 */
@@ -392,4 +411,53 @@ body {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
+} 
+
+/* 添加搜索框的清除按钮样式 */
+.search-container {
+    position: relative;  /* 添加相对定位 */
+}
+
+.clear-button {
+    position: absolute;
+    right: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    display: none;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.clear-button::before,
+.clear-button::after {
+    content: '';
+    position: absolute;
+    width: 2px;
+    height: 16px;
+    background-color: #fff;
+    top: 0;
+    left: 50%;
+}
+
+.clear-button::before {
+    transform: rotate(45deg);
+}
+
+.clear-button::after {
+    transform: rotate(-45deg);
+}
+
+.clear-button:hover {
+    opacity: 1;
+}
+
+/* 当搜索框有内容时显示清除按钮 */
+#searchInput:not(:placeholder-shown) + .clear-button {
+    display: block;
 } 
