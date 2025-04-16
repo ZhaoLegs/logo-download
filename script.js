@@ -247,6 +247,7 @@ class AppStartupIconDownload {
                     // 返回带有评分的结果
                     return {
                         ...app,
+                        artworkUrl1024: app.artworkUrl512 ? app.artworkUrl512.replace('512x512', '1024x1024') : null,
                         artworkUrl512: app.artworkUrl512 || 
                             (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100),
                         relevanceScore,
@@ -296,7 +297,7 @@ class AppStartupIconDownload {
                              style="cursor: pointer;">
                         <h3 class="app-name">${cleanName}</h3>
                         <button class="download-btn" 
-                                data-icon-url="${app.artworkUrl512 || app.artworkUrl100}"
+                                data-icon-url="${app.artworkUrl1024 || app.artworkUrl512 || app.artworkUrl100}"
                                 data-app-name="${cleanName}">
                             Download
                         </button>
@@ -318,8 +319,22 @@ class AppStartupIconDownload {
         // 下载按钮点击事件
         this.resultsContainer.querySelectorAll('.download-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
-                const iconUrl = e.target.dataset.iconUrl;
+                let iconUrl = e.target.dataset.iconUrl;
                 const appName = e.target.dataset.appName;
+                
+                // 尝试转换为1024px图标
+                if (iconUrl && iconUrl.includes('512x512')) {
+                    const potentialHDUrl = iconUrl.replace('512x512', '1024x1024');
+                    try {
+                        // 检查高清图标是否存在
+                        const response = await fetch(potentialHDUrl, { method: 'HEAD' });
+                        if (response.ok) {
+                            iconUrl = potentialHDUrl;
+                        }
+                    } catch (error) {
+                        console.log('HD icon not available, using original URL');
+                    }
+                }
                 
                 try {
                     const response = await fetch(iconUrl);
@@ -445,8 +460,12 @@ class AppStartupIconDownload {
                 const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(appName)}&entity=software&limit=1&country=us`);
                 const data = await response.json();
                 if (data.results && data.results[0]) {
-                    // 优先使用高清图标
-                    const iconUrl = data.results[0].artworkUrl512 || data.results[0].artworkUrl100;
+                    // 获取高清图标URL
+                    let iconUrl = data.results[0].artworkUrl512 || data.results[0].artworkUrl100;
+                    // 尝试转换为1024px图标
+                    if (iconUrl && iconUrl.includes('512x512')) {
+                        iconUrl = iconUrl.replace('512x512', '1024x1024');
+                    }
                     this.iconUrls.add(iconUrl);
                 }
             } catch (error) {
