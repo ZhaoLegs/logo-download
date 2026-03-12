@@ -19,6 +19,46 @@ class AppStartupIconDownload {
         this.resultsContainer = document.getElementById('results');
     }
 
+    trackAnalytics(eventName, data = {}) {
+        if (!window.umami || typeof window.umami.track !== 'function') {
+            return;
+        }
+
+        try {
+            window.umami.track(eventName, data);
+        } catch (error) {
+            console.warn('Analytics track failed:', error);
+        }
+    }
+
+    buildSearchAnalyticsPayload(rawTerm, searchKey) {
+        const trimmedTerm = (rawTerm || '').trim();
+        const queryType = this.extractAppIdFromInput(trimmedTerm)
+            ? 'app_id'
+            : this.isChineseQuery(searchKey)
+                ? 'chinese'
+                : 'keyword';
+
+        return {
+            query: trimmedTerm.slice(0, 80),
+            normalized_query: searchKey.slice(0, 80),
+            query_type: queryType,
+            query_length: trimmedTerm.length
+        };
+    }
+
+    trackSearchResults(payload, results, source) {
+        const firstResult = Array.isArray(results) ? results[0] : null;
+
+        this.trackAnalytics('search_results', {
+            ...payload,
+            results_count: Array.isArray(results) ? results.length : 0,
+            result_source: source,
+            top_store: firstResult?.store || firstResult?.source || 'unknown',
+            top_app: (firstResult?.trackName || '').slice(0, 80)
+        });
+    }
+
     initializeEventListeners() {
         // 监听输入框内容变化
         this.searchInput.addEventListener('input', () => {
@@ -381,9 +421,11 @@ class AppStartupIconDownload {
         if (!rawTerm) return;
         const normalizedTerm = this.normalizeSearchTerm(rawTerm);
         const searchKey = normalizedTerm || rawTerm;
+        const analyticsPayload = this.buildSearchAnalyticsPayload(rawTerm, searchKey);
 
         // 避免在无改变的情况下重复请求
         if (searchKey === this.lastSearchTerm && this.cache.has(searchKey)) {
+            this.trackSearchResults(analyticsPayload, this.cache.get(searchKey), 'memory-cache');
             this.displayResults(this.cache.get(searchKey));
             return;
         }
@@ -391,10 +433,12 @@ class AppStartupIconDownload {
 
         try {
             this.showLoading();
+            this.trackAnalytics('search_started', analyticsPayload);
 
             // 检查缓存
             if (this.cache.has(searchKey)) {
                 this.hideLoading();
+                this.trackSearchResults(analyticsPayload, this.cache.get(searchKey), 'memory-cache');
                 this.displayResults(this.cache.get(searchKey));
                 return;
             }
@@ -409,6 +453,7 @@ class AppStartupIconDownload {
                 this.cache.set(searchKey, backendResults);
                 this.cleanCache();
                 this.hideLoading();
+                this.trackSearchResults(analyticsPayload, backendResults, 'backend-api');
                 this.displayResults(backendResults);
                 return;
             }
@@ -425,6 +470,7 @@ class AppStartupIconDownload {
                     this.cache.set(searchKey, results);
                     this.cleanCache();
                     this.hideLoading();
+                    this.trackSearchResults(analyticsPayload, results, 'app-id-lookup');
                     this.displayResults(results);
                     return;
                 }
@@ -458,16 +504,22 @@ class AppStartupIconDownload {
                 this.cache.set(searchKey, results);
                 this.cleanCache();
                 this.hideLoading();
+                this.trackSearchResults(analyticsPayload, results, 'jsonp-fallback');
                 this.displayResults(results);
             } else {
                 this.hideLoading();
                 this.resultsContainer.innerHTML = '';
+                this.trackAnalytics('search_empty', analyticsPayload);
                 this.showToast('No results found');
             }
 
         } catch (error) {
             console.error('Search error:', error);
             this.hideLoading();
+            this.trackAnalytics('search_failed', {
+                ...analyticsPayload,
+                error_name: error?.name || 'Error'
+            });
             this.showToast('Search failed, please try again');
         }
     }
@@ -559,6 +611,7 @@ class AppStartupIconDownload {
                 const iconUrl = app.artworkUrl512 || app.artworkUrl100;
                 const appUrl = app.trackViewUrl || '';
                 const downloadUrl = this.buildIconDownloadUrl(iconUrl);
+                const appStore = app.store || app.source || 'unknown';
                 
                 return `
                     <div class="app-card">
@@ -566,12 +619,15 @@ class AppStartupIconDownload {
                              alt="${this.escapeHtml(cleanName)}" 
                              class="app-icon"
                              data-app-url="${this.escapeHtml(appUrl)}"
+                             data-app-store="${this.escapeHtml(appStore)}"
+                             data-app-name="${this.escapeHtml(cleanName)}"
                              style="cursor: pointer;">
                         <h3 class="app-name">${this.escapeHtml(cleanName)}</h3>
                         <button class="download-btn" 
                                 data-icon-url="${this.escapeHtml(iconUrl)}"
                                 data-download-url="${this.escapeHtml(downloadUrl)}"
-                                data-app-name="${this.escapeHtml(cleanName)}">
+                                data-app-name="${this.escapeHtml(cleanName)}"
+                                data-app-store="${this.escapeHtml(appStore)}">
                             Download
                         </button>
                     </div>
@@ -590,6 +646,10 @@ class AppStartupIconDownload {
             icon.addEventListener('click', (e) => {
                 const appUrl = e.target.dataset.appUrl;
                 if (appUrl) {
+                    this.trackAnalytics('open_store', {
+                        app_name: (e.target.dataset.appName || '').slice(0, 80),
+                        store: e.target.dataset.appStore || 'unknown'
+                    });
                     window.open(appUrl, '_blank');
                 }
             });
@@ -600,6 +660,7 @@ class AppStartupIconDownload {
             button.addEventListener('click', async (e) => {
                 const iconUrl = e.target.dataset.downloadUrl || e.target.dataset.iconUrl;
                 const appName = e.target.dataset.appName;
+                const appStore = e.target.dataset.appStore || 'unknown';
                 
                 try {
                     const response = await fetch(iconUrl);
@@ -628,9 +689,17 @@ class AppStartupIconDownload {
                     URL.revokeObjectURL(downloadLink.href);
                     
                     // 显示成功提示
+                    this.trackAnalytics('download_icon', {
+                        app_name: (appName || '').slice(0, 80),
+                        store: appStore
+                    });
                     this.showToast('Icon downloaded successfully');
                 } catch (error) {
                     console.error('Download error:', error);
+                    this.trackAnalytics('download_failed', {
+                        app_name: (appName || '').slice(0, 80),
+                        store: appStore
+                    });
                     this.showToast('Download failed, please try again');
                 }
             });
