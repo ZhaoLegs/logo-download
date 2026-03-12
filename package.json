@@ -1,0 +1,14 @@
+{
+  "name": "logo-download",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "crawlee": "^3.16.0",
+    "express": "^5.1.0"
+  }
+}

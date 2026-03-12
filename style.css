@@ -48,7 +48,16 @@ body {
     justify-content: center;
     align-items: center;
     width: 100%;
-    transition: all 0.3s ease;
+    position: fixed;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    padding: 20px 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
+    transition: top 0.35s ease, transform 0.35s ease, background 0.35s ease, backdrop-filter 0.35s ease;
+    will-change: top, transform;
 }
 
 .search-container {
@@ -112,10 +121,15 @@ body {
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
+    margin-top: 100px;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
     padding: 0;
+    transform: translateY(40vh);
+    opacity: 0;
+    transition: transform 0.35s ease 0s, opacity 0.35s ease 0s;
+    will-change: transform;
 }
 
 .app-card {
@@ -208,18 +222,32 @@ body {
 
 /* 添加 Loading 动画样式 */
 .loading-container {
-    display: none;
+    display: flex;
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.loading-container.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.loading-box {
     width: 80px;
     height: 80px;
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-radius: 16px;
-    z-index: 2000;
+    position: relative;
 }
 
 .loading {
@@ -243,11 +271,6 @@ body {
         transform: translate(-50%, -50%) rotate(360deg);
     }
 }
-
-/* 显示loading时的样式 */
-.loading.active {
-    display: block;
-} 
 
 /* 添加提示框样式 */
 .toast {
@@ -392,19 +415,17 @@ body {
 
 /* 添加搜索结果时的吸顶样式 */
 .has-results .center-search {
-    position: fixed;
     top: 0;
-    left: 0;
-    padding: 20px 0;
+    transform: translateY(0);
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
-    z-index: 1000;
 }
 
-/* 添加内容偏移，防止搜索框遮挡内容 */
 .has-results .results-container {
-    margin-top: 100px;
-} 
+    transform: translateY(0);
+    opacity: 1;
+    transition: transform 0.35s ease 0.12s, opacity 0.35s ease 0.12s;
+}
 
 /* 当有搜索结果时隐藏 Twitter 链接 */
 .has-results .twitter-link {

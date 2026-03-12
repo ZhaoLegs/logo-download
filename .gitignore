@@ -1,0 +1,7 @@
+node_modules
+crawlee_storage
+storage
+.DS_Store
+.playwright-cli
+__pycache__/
+.vscode/

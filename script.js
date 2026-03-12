@@ -56,25 +56,29 @@ class AppStartupIconDownload {
         const loadingContainer = document.createElement('div');
         loadingContainer.className = 'loading-container';
         
+        const loadingBox = document.createElement('div');
+        loadingBox.className = 'loading-box';
+
         // 创建 loading 元素
         const loading = document.createElement('div');
         loading.className = 'loading';
         
         // 组装
-        loadingContainer.appendChild(loading);
+        loadingBox.appendChild(loading);
+        loadingContainer.appendChild(loadingBox);
         document.body.appendChild(loadingContainer);
         this.loadingElement = loadingContainer;
     }
 
     showLoading() {
         if (this.loadingElement) {
-            this.loadingElement.style.display = 'block';
+            this.loadingElement.classList.add('active');
         }
     }
 
     hideLoading() {
         if (this.loadingElement) {
-            this.loadingElement.style.display = 'none';
+            this.loadingElement.classList.remove('active');
         }
     }
 
@@ -108,7 +112,7 @@ class AppStartupIconDownload {
             '哔哩哔哩': 'Bilibili',
             '网易云音乐': 'NetEase Music',
             '知乎': 'Zhihu',
-            '小红书': 'RED',
+            '小红书': 'rednote',
             '快手': 'Kwai',
             '饿了么': 'Ele.me',
             '拼多多': 'Pinduoduo',
@@ -122,58 +126,337 @@ class AppStartupIconDownload {
         return /[\u4e00-\u9fa5]/.test(text);
     }
 
+    normalizeSearchTerm(text) {
+        if (!text) return '';
+        let term = text.trim();
+        term = term.replace(/(图标|应用|软件)/g, ' ');
+        term = term.replace(/\b(icon|logo|app|application)\b/gi, ' ');
+        term = term.replace(/\s+/g, ' ').trim();
+        return term;
+    }
+
+    // 使用 JSONP 调用 iTunes Search / Lookup，绕过 CORS 限制
+    jsonpRequest(url, callbackParam = 'callback') {
+        return new Promise((resolve, reject) => {
+            const callbackName = `itunesJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const separator = url.includes('?') ? '&' : '?';
+            const script = document.createElement('script');
+            script.src = `${url}${separator}${callbackParam}=${callbackName}`;
+            script.async = true;
+
+            const cleanup = () => {
+                if (script.parentNode) {
+                    script.parentNode.removeChild(script);
+                }
+                try {
+                    delete window[callbackName];
+                } catch (e) {
+                    window[callbackName] = undefined;
+                }
+            };
+
+            window[callbackName] = (data) => {
+                cleanup();
+                resolve(data);
+            };
+
+            script.onerror = () => {
+                cleanup();
+                reject(new Error('JSONP request failed'));
+            };
+
+            document.body.appendChild(script);
+
+            // 超时保护，防止一直挂起
+            setTimeout(() => {
+                if (window[callbackName]) {
+                    cleanup();
+                    reject(new Error('JSONP request timeout'));
+                }
+            }, 10000);
+        });
+    }
+
+    async fetchViaJina(url) {
+        const response = await fetch(`https://r.jina.ai/${url}`, {
+            headers: {
+                'Accept': 'text/plain'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Proxy request failed: ${response.status}`);
+        }
+
+        const text = await response.text();
+        const jsonStart = text.indexOf('{');
+        if (jsonStart === -1) {
+            throw new Error('Proxy response missing JSON');
+        }
+
+        return JSON.parse(text.slice(jsonStart));
+    }
+
+    async requestItunesJson(url) {
+        if (window.location.protocol.startsWith('http')) {
+            try {
+                const response = await fetch(`/api/itunes?url=${encodeURIComponent(url)}`, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (response.ok) {
+                    return await response.json();
+                }
+            } catch (_) {
+            }
+        }
+
+        return await this.jsonpRequest(url);
+    }
+
+    // 从输入中提取 App Store ID（支持直接输入 ID 或整条链接）
+    extractAppIdFromInput(input) {
+        if (!input) return null;
+
+        const trimmed = input.trim();
+
+        // 1) 直接输入 id123456789 或 123456789
+        const directIdMatch = trimmed.match(/^id?(\d{6,12})$/i);
+        if (directIdMatch) {
+            return directIdMatch[1];
+        }
+
+        // 2) App Store 链接，如：https://apps.apple.com/.../id123456789
+        const urlIdMatch = trimmed.match(/id(\d{6,12})/);
+        if (urlIdMatch) {
+            return urlIdMatch[1];
+        }
+
+        return null;
+    }
+
+    // 通过 App Store 的 lookup 接口按 ID 精准获取 App 信息
+    async searchByAppId(appId, regionOrder = ['us', 'cn']) {
+        for (const region of regionOrder) {
+            try {
+                const data = await this.requestItunesJson(
+                    `https://itunes.apple.com/lookup?id=${encodeURIComponent(appId)}&country=${region}`
+                );
+                if (!data.results || data.results.length === 0) continue;
+
+                // 与 searchInRegion 的结果结构尽量保持一致
+                const processedResults = data.results
+                    .filter(app => app.artworkUrl100 || app.artworkUrl512)
+                    .map(app => ({
+                        ...app,
+                        artworkUrl512: app.artworkUrl512 ||
+                            (app.artworkUrl100 ? app.artworkUrl100.replace('100x100', '512x512') : app.artworkUrl100)
+                    }));
+
+                if (processedResults.length > 0) {
+                    return processedResults;
+                }
+            } catch (error) {
+                console.error(`Lookup error in ${region}:`, error);
+            }
+        }
+
+        return null;
+    }
+
+    async searchAcrossRegions(term, regionOrder) {
+        let results = null;
+
+        for (const region of regionOrder) {
+            const regionalResults = await this.searchInRegion(term, region);
+            if (regionalResults && regionalResults.length > 0) {
+                results = [...(results || []), ...regionalResults];
+            }
+        }
+
+        return results;
+    }
+
+    rescoreResultsForQuery(results, term) {
+        return (results || []).map((app) => {
+            const nameLower = (app.trackName || '').toLowerCase();
+            const searchLower = term.toLowerCase();
+            let relevanceScore = 0;
+
+            if (nameLower === searchLower) {
+                relevanceScore = 100;
+            } else if (nameLower.startsWith(searchLower)) {
+                relevanceScore = 80;
+            } else if (nameLower.includes(searchLower)) {
+                relevanceScore = 60;
+            } else {
+                const searchTerms = searchLower.split(/\s+/).filter(Boolean);
+                const nameTerms = nameLower.split(/\s+/).filter(Boolean);
+                const matchCount = searchTerms.filter((searchTerm) =>
+                    nameTerms.some((nameTerm) => nameTerm.includes(searchTerm))
+                ).length;
+                relevanceScore = searchTerms.length ? (matchCount / searchTerms.length) * 40 : 0;
+            }
+
+            if (relevanceScore <= (app.relevanceScore || 0)) {
+                return app;
+            }
+
+            const ratingScore = app.ratingScore ?? ((app.averageUserRating || 0) * 20);
+            const popularityScore = app.popularityScore ?? Math.min(Math.log10(app.userRatingCount || 1) * 10, 100);
+            const releaseScore = app.releaseScore ?? (app.releaseDate ?
+                Math.min((new Date() - new Date(app.releaseDate)) / (1000 * 60 * 60 * 24 * 365), 5) * 10 : 0);
+
+            return {
+                ...app,
+                relevanceScore,
+                ratingScore,
+                popularityScore,
+                releaseScore,
+                totalScore: relevanceScore * 0.4 + ratingScore * 0.3 + popularityScore * 0.2 + releaseScore * 0.1
+            };
+        });
+    }
+
+    filterIrrelevantResults(results) {
+        const apps = results || [];
+        if (!apps.some((app) => (app.relevanceScore || 0) > 0)) {
+            return apps;
+        }
+
+        return apps.filter((app) => (app.relevanceScore || 0) > 0);
+    }
+
+    async searchWithBackend(rawTerm) {
+        if (!rawTerm || !window.location.protocol.startsWith('http')) {
+            return null;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        try {
+            const response = await fetch(`/api/search?q=${encodeURIComponent(rawTerm)}`, {
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                return null;
+            }
+
+            const payload = await response.json();
+            return Array.isArray(payload.results) ? payload.results : null;
+        } catch (error) {
+            console.warn('Backend search unavailable, falling back to JSONP:', error);
+            return null;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
+    buildIconDownloadUrl(iconUrl) {
+        if (!iconUrl) return '';
+        if (window.location.protocol.startsWith('http')) {
+            return `/api/icon?url=${encodeURIComponent(iconUrl)}`;
+        }
+        return iconUrl;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
     async performSearch() {
-        let searchTerm = this.searchInput.value.trim();
-        if (!searchTerm) return;
+        const rawTerm = this.searchInput.value.trim();
+        if (!rawTerm) return;
+        const normalizedTerm = this.normalizeSearchTerm(rawTerm);
+        const searchKey = normalizedTerm || rawTerm;
+
+        // 避免在无改变的情况下重复请求
+        if (searchKey === this.lastSearchTerm && this.cache.has(searchKey)) {
+            this.displayResults(this.cache.get(searchKey));
+            return;
+        }
+        this.lastSearchTerm = searchKey;
 
         try {
             this.showLoading();
 
             // 检查缓存
-            if (this.cache.has(searchTerm)) {
+            if (this.cache.has(searchKey)) {
                 this.hideLoading();
-                this.displayResults(this.cache.get(searchTerm));
+                this.displayResults(this.cache.get(searchKey));
                 return;
             }
 
             // 转换中文应用名称
-            const searchQuery = this.chineseAppMap[searchTerm] || searchTerm;
+            const searchQuery = this.chineseAppMap[searchKey] || searchKey;
             let results = null;
 
-            // 判断搜索语言，决定搜索顺序
-            const isChineseSearch = this.isChineseQuery(searchTerm);
+            // 优先尝试后端聚合搜索（iTunes + Crawlee）
+            const backendResults = await this.searchWithBackend(rawTerm);
+            if (backendResults && backendResults.length > 0) {
+                this.cache.set(searchKey, backendResults);
+                this.cleanCache();
+                this.hideLoading();
+                this.displayResults(backendResults);
+                return;
+            }
 
-            if (isChineseSearch) {
-                // 中文搜索：先搜中国区，再搜美国区
-                results = await this.searchInRegion(searchQuery, 'cn');
-                if (!results || results.length === 0) {
-                    results = await this.searchInRegion(searchQuery, 'us');
-                }
-            } else {
-                // 英文搜索：先搜美国区，再搜中国区
-                results = await this.searchInRegion(searchQuery, 'us');
-                if (!results || results.length === 0) {
-                    results = await this.searchInRegion(searchQuery, 'cn');
+            // 判断搜索语言，决定搜索顺序
+            const isChineseSearch = this.isChineseQuery(searchKey);
+
+            // 优先处理 App Store 链接或 ID，提升精准度
+            const appId = this.extractAppIdFromInput(rawTerm);
+            if (appId) {
+                const regionOrder = isChineseSearch ? ['cn', 'us'] : ['us', 'cn'];
+                results = await this.searchByAppId(appId, regionOrder);
+                if (results && results.length > 0) {
+                    this.cache.set(searchKey, results);
+                    this.cleanCache();
+                    this.hideLoading();
+                    this.displayResults(results);
+                    return;
                 }
             }
 
-            // 如果映射后的搜索没有结果，尝试原始搜索词
-            if (!results && searchQuery !== searchTerm) {
-                if (isChineseSearch) {
-                    results = await this.searchInRegion(searchTerm, 'cn');
-                    if (!results || results.length === 0) {
-                        results = await this.searchInRegion(searchTerm, 'us');
-                    }
-                } else {
-                    results = await this.searchInRegion(searchTerm, 'us');
-                    if (!results || results.length === 0) {
-                        results = await this.searchInRegion(searchTerm, 'cn');
+            const regionOrder = isChineseSearch ? ['cn', 'us'] : ['us', 'cn'];
+            results = await this.searchAcrossRegions(searchQuery, regionOrder);
+
+            // 映射词结果不强时，补充原词结果再排序，避免把弱相关结果顶上来
+            if (searchQuery !== searchKey) {
+                const hasStrongMatch = (results || []).some(app => (app.relevanceScore || 0) >= 80);
+                if (!results || results.length === 0 || !hasStrongMatch) {
+                    const originalResults = await this.searchAcrossRegions(searchKey, regionOrder);
+                    if (originalResults && originalResults.length > 0) {
+                        results = [...(results || []), ...originalResults]
+                            .filter((app, index, apps) => {
+                                const appName = (app.trackName || '').toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '');
+                                return index === apps.findIndex((candidate) =>
+                                    ((candidate.trackName || '').toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '') === appName)
+                                );
+                            });
                     }
                 }
+
+                results = this.rescoreResultsForQuery(results, searchKey)
+                    .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+                results = this.filterIrrelevantResults(results);
             }
 
             if (results && results.length > 0) {
-                this.cache.set(searchTerm, results);
+                this.cache.set(searchKey, results);
+                this.cleanCache();
                 this.hideLoading();
                 this.displayResults(results);
             } else {
@@ -191,20 +474,9 @@ class AppStartupIconDownload {
 
     async searchInRegion(term, region) {
         try {
-            const response = await fetch(
-                `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=50&country=${region}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    }
-                }
+            const data = await this.requestItunesJson(
+                `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=software&entity=software,iPadSoftware&limit=50&country=${region}`
             );
-
-            if (!response.ok) return null;
-
-            const data = await response.json();
             if (!data.results || data.results.length === 0) return null;
 
             // 增强的搜索结果排序处理
@@ -277,8 +549,6 @@ class AppStartupIconDownload {
     }
 
     displayResults(results) {
-        document.body.classList.add('has-results');
-        
         // 优化显示结果
         this.resultsContainer.innerHTML = results
             // 确保应用名称和图标都存在
@@ -286,24 +556,34 @@ class AppStartupIconDownload {
             .map(app => {
                 // 处理应用名称，移除多余空格和特殊字符
                 const cleanName = app.trackName.trim().replace(/\s+/g, ' ');
+                const iconUrl = app.artworkUrl512 || app.artworkUrl100;
+                const appUrl = app.trackViewUrl || '';
+                const downloadUrl = this.buildIconDownloadUrl(iconUrl);
                 
                 return `
                     <div class="app-card">
-                        <img src="${app.artworkUrl512 || app.artworkUrl100}" 
-                             alt="${cleanName}" 
+                        <img src="${this.escapeHtml(iconUrl)}" 
+                             alt="${this.escapeHtml(cleanName)}" 
                              class="app-icon"
-                             data-app-url="${app.trackViewUrl}"
+                             data-app-url="${this.escapeHtml(appUrl)}"
                              style="cursor: pointer;">
-                        <h3 class="app-name">${cleanName}</h3>
+                        <h3 class="app-name">${this.escapeHtml(cleanName)}</h3>
                         <button class="download-btn" 
-                                data-icon-url="${app.artworkUrl512 || app.artworkUrl100}"
-                                data-app-name="${cleanName}">
+                                data-icon-url="${this.escapeHtml(iconUrl)}"
+                                data-download-url="${this.escapeHtml(downloadUrl)}"
+                                data-app-name="${this.escapeHtml(cleanName)}">
                             Download
                         </button>
                     </div>
                 `;
             })
             .join('');
+
+        if (!document.body.classList.contains('has-results')) {
+            requestAnimationFrame(() => {
+                document.body.classList.add('has-results');
+            });
+        }
 
         // 图标点击事件
         this.resultsContainer.querySelectorAll('.app-icon').forEach(icon => {
@@ -318,11 +598,20 @@ class AppStartupIconDownload {
         // 下载按钮点击事件
         this.resultsContainer.querySelectorAll('.download-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
-                const iconUrl = e.target.dataset.iconUrl;
+                const iconUrl = e.target.dataset.downloadUrl || e.target.dataset.iconUrl;
                 const appName = e.target.dataset.appName;
                 
                 try {
                     const response = await fetch(iconUrl);
+                    if (!response.ok) {
+                        throw new Error(`Download request failed with status ${response.status}`);
+                    }
+
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType && !contentType.startsWith('image/')) {
+                        throw new Error(`Unexpected content type: ${contentType}`);
+                    }
+
                     const blob = await response.blob();
                     
                     // 创建下载链接
@@ -351,6 +640,15 @@ class AppStartupIconDownload {
     async downloadIcon(url, appName) {
         try {
             const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Download request failed with status ${response.status}`);
+            }
+
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType && !contentType.startsWith('image/')) {
+                throw new Error(`Unexpected content type: ${contentType}`);
+            }
+
             const blob = await response.blob();
             const blobUrl = window.URL.createObjectURL(blob);
             
@@ -372,6 +670,9 @@ class AppStartupIconDownload {
     setupFallingIcons() {
         this.fallingIconsContainer = document.querySelector('.falling-icons');
         this.iconUrls = new Set();
+        this.fallingIconInterval = null;
+        this.fallingIconTimeouts = [];
+        this.isFallingIconsPaused = false;
         this.defaultApps = [
             // 社交媒体
             'Instagram', 'TikTok', 'WeChat', 'Facebook',
@@ -414,11 +715,48 @@ class AppStartupIconDownload {
         ];
         
         this.loadIconsFromCache();
-        setInterval(() => this.createFallingIcon(), 800);
-        
-        // 初始时立即创建多个图标
+        this.resumeFallingIcons();
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.pauseFallingIcons();
+            } else {
+                this.resumeFallingIcons();
+            }
+        });
+    }
+
+    pauseFallingIcons() {
+        this.isFallingIconsPaused = true;
+
+        if (this.fallingIconInterval) {
+            clearInterval(this.fallingIconInterval);
+            this.fallingIconInterval = null;
+        }
+
+        if (this.fallingIconTimeouts.length) {
+            this.fallingIconTimeouts.forEach(id => clearTimeout(id));
+            this.fallingIconTimeouts = [];
+        }
+
+        if (this.fallingIconsContainer) {
+            this.fallingIconsContainer.innerHTML = '';
+        }
+    }
+
+    resumeFallingIcons() {
+        this.isFallingIconsPaused = false;
+
+        if (!this.fallingIconsContainer) return;
+        if (this.fallingIconInterval) return;
+
+        this.fallingIconsContainer.innerHTML = '';
+
+        this.fallingIconInterval = setInterval(() => this.createFallingIcon(), 800);
+
         for (let i = 0; i < 5; i++) {
-            setTimeout(() => this.createFallingIcon(), i * 200);
+            const id = setTimeout(() => this.createFallingIcon(), i * 200);
+            this.fallingIconTimeouts.push(id);
         }
     }
 
@@ -439,18 +777,39 @@ class AppStartupIconDownload {
     }
 
     async loadDefaultIcons() {
-        console.log('Loading fresh icons');
-        for (const appName of this.defaultApps) {
+        if (window.location.protocol.startsWith('http')) {
             try {
-                const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(appName)}&entity=software&limit=1&country=us`);
-                const data = await response.json();
-                if (data.results && data.results[0]) {
-                    // 优先使用高清图标
-                    const iconUrl = data.results[0].artworkUrl512 || data.results[0].artworkUrl100;
-                    this.iconUrls.add(iconUrl);
+                const response = await fetch('/api/default-icons', {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const payload = await response.json();
+                    if (Array.isArray(payload.icons) && payload.icons.length > 0) {
+                        this.iconUrls = new Set(payload.icons);
+                    }
                 }
             } catch (error) {
-                console.error('Error loading default icon:', error);
+                console.warn('Failed to load default icons from backend:', error);
+            }
+        }
+
+        if (!this.iconUrls.size) {
+            for (const appName of this.defaultApps) {
+                try {
+                    const data = await this.requestItunesJson(
+                        `https://itunes.apple.com/search?term=${encodeURIComponent(appName)}&media=software&entity=software,iPadSoftware&limit=1&country=us`
+                    );
+                    if (data.results && data.results[0]) {
+                        const iconUrl = data.results[0].artworkUrl512 || data.results[0].artworkUrl100;
+                        if (iconUrl) {
+                            this.iconUrls.add(iconUrl);
+                        }
+                    }
+                } catch (_) {
+                }
             }
         }
 
@@ -462,6 +821,7 @@ class AppStartupIconDownload {
     }
 
     createFallingIcon() {
+        if (this.isFallingIconsPaused || document.hidden) return;
         if (!this.iconUrls.size) return;
 
         const icon = document.createElement('img');
