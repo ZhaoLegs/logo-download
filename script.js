@@ -591,7 +591,7 @@ class AppStartupIconDownload {
                     // 相关性接近时，按综合得分排序
                     return b.totalScore - a.totalScore;
                 })
-                .slice(0, 30);
+                .slice(0, 48);
 
             return processedResults;
         } catch (error) {

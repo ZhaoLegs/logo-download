@@ -2,7 +2,7 @@
 
 一个用于搜索并下载 App 启动图标的小工具，优先返回 App Store 图标，在苹果接口命中不足时会自动补抓 Google Play 结果。
 
-在线仓库: [ZhaoLegs/logo-download](https://github.com/ZhaoLegs/logo-download)
+在线地址: [download-bice-ten.vercel.app](https://download-bice-ten.vercel.app)
 
 ## 功能
 
