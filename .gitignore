@@ -5,3 +5,4 @@ storage
 .playwright-cli
 __pycache__/
 .vscode/
+.vercel

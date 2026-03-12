@@ -11,6 +11,7 @@
 - App Store 结果不足时，自动使用 `Crawlee` 补抓 Google Play
 - 首页背景图标由后端预加载，不再在前端直接请求 iTunes
 - 图标下载走 `/api/icon` 代理，减少跨域失败
+- 已适配 Vercel Serverless Functions，可直接部署到 Vercel
 - 兼容两种启动方式:
   - `npm start` 启动 Node 服务，默认端口 `3000`
   - `python3 server.py` 启动兼容代理，默认端口 `5173`，会自动拉起 Node 后端
@@ -62,15 +63,30 @@ curl "http://localhost:3000/api/search?q=mixplorer"
 
 代理下载图标资源，仅允许 Google Play 和 Apple 图标域名。
 
+## 部署
+
+### Vercel
+
+当前仓库已包含 `api/search.js`、`api/default-icons.js`、`api/icon.js` 和 `vercel.json`，推送到 GitHub 后可以由 Vercel 直接构建并提供后端接口。
+
+### 本地预览 Vercel 版本
+
+```bash
+vercel dev
+```
+
 ## 目录说明
 
 ```text
-.
+. 
 ├── index.html      # 页面入口
 ├── script.js       # 前端搜索、渲染、下载逻辑
 ├── style.css       # 页面样式
+├── api/            # Vercel Serverless Functions
+├── lib/            # 搜索与图标服务共享逻辑
 ├── server.js       # Node/Express 搜索服务
 ├── server.py       # Python 兼容代理入口
+├── vercel.json     # Vercel 配置
 └── package.json    # 依赖与启动脚本
 ```
 
