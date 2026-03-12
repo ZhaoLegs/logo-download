@@ -604,13 +604,14 @@ class AppStartupIconDownload {
         // 优化显示结果
         this.resultsContainer.innerHTML = results
             // 确保应用名称和图标都存在
-            .filter(app => app.trackName && (app.artworkUrl512 || app.artworkUrl100))
+            .filter(app => app.trackName && (app.artworkUrlMax || app.artworkUrl512 || app.artworkUrl100))
             .map(app => {
                 // 处理应用名称，移除多余空格和特殊字符
                 const cleanName = app.trackName.trim().replace(/\s+/g, ' ');
-                const iconUrl = app.artworkUrl512 || app.artworkUrl100;
+                const iconUrl = app.artworkUrl512 || app.artworkUrl100 || app.artworkUrlMax;
+                const downloadSourceUrl = app.artworkUrlMax || app.artworkUrl512 || app.artworkUrl100;
                 const appUrl = app.trackViewUrl || '';
-                const downloadUrl = this.buildIconDownloadUrl(iconUrl);
+                const downloadUrl = this.buildIconDownloadUrl(downloadSourceUrl);
                 const appStore = app.store || app.source || 'unknown';
                 
                 return `
